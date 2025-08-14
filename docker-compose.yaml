@@ -4,15 +4,20 @@ services:
     environment:
       WORKERS: ${WORKERS:-2}
       THREADS: ${THREADS:-2}
-    command: make migrate run.server.prod
+    command: make run.server.prod
     ports:
       - "${API_PORT}:80"
     depends_on:
-      - pgbouncer
-      - migrations
-      - collectstatic
-      - redis
-      - rabbitmq
+      pgbouncer:
+        condition: service_started
+      migrations:
+        condition: service_completed_successfully
+      collectstatic:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
     restart: always
     volumes:
       - .:/application
@@ -104,6 +109,7 @@ services:
     command: make migrate
     depends_on:
       - db
+    restart: "no"
     volumes:
       - .:/application
     networks:
