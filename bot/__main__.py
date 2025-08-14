@@ -4,6 +4,8 @@ import logging.config
 import sys
 
 from aiogram import Bot, Dispatcher
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
 from aiogram.types import BotCommand
 
 from api.config.logging import LOGGING
@@ -13,7 +15,12 @@ from bot.handlers import router
 logging.config.dictConfig(LOGGING)
 logger = logging.getLogger(__name__)
 
-bot = Bot(TELEGRAM_API_TOKEN, parse_mode="HTML")
+bot = Bot(
+    TELEGRAM_API_TOKEN,
+    default=DefaultBotProperties(
+        parse_mode=ParseMode.HTML
+    )
+)
 
 dispatcher = Dispatcher()
 dispatcher.include_router(router)
