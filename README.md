@@ -1,38 +1,32 @@
-### Dev-зависимости автоматически в local
+### Dev-зависимости (локальная разработка)
 
-При старте контейнера `api` исполняется `docker/entrypoint.sh`. Если переменная окружения `ENVIRONMENT=local` и в корне есть `requirements-dev.txt`, то автоматически выполняется:
+Dev-зависимости ставятся на этапе сборки образа `api`, если `ENVIRONMENT=local`.
 
-```bash
-pip install -r requirements-dev.txt
-```
+Шаги:
 
-Установка делается один раз за жизненный цикл тома — ставится маркер-файл `.dev_deps_installed`, чтобы не тратить время на каждый рестарт. В прод-окружении (любое `ENVIRONMENT` кроме `local`) установка dev-зависимостей пропускается.
-
-Чтобы включить режим `local`, выставьте в `.env`:
+1) В файле `.env` укажите:
 
 ```env
 ENVIRONMENT=local
 ```
 
-И перезапустите контейнеры.
+2) Пересоберите образ и поднимите сервис:
 
-Дополнительно:
+```bash
+docker compose build api
+docker compose up -d api
+```
 
-- Установка dev-зависимостей происходит только в контейнере `api` (остальные сервисы не требуют dev-зависимостей).
-- Проверить установку можно по логам:
+После сборки `pytest` и прочие dev-пакеты доступны внутри контейнера `api`:
 
-  ```bash
-  docker compose logs api | grep entrypoint
-  ```
+```bash
+docker compose exec api python -m pytest -q
+```
 
-- Принудительная переустановка (сброс маркера и рестарт):
+Примечания:
 
-  ```bash
-  docker compose exec api rm -f /application/.dev_deps_installed
-  docker compose restart api
-  ```
-
-- Файл-маркер `.dev_deps_installed` добавлен в `.gitignore` и в репозиторий не попадёт.
+- Установка dev-зависимостей происходит только для сервиса `api`.
+- Никаких entrypoint-скриптов и маркеров не используется.
 
 ### Локали Postgres
 
