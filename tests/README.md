@@ -61,7 +61,7 @@ def _seed_customs_rates(django_db_setup, django_db_blocker):
 
 ## Тесты провайдера курсов ЦБ РФ
 
-Добавлен модуль `tests/unit/test_currency_provider.py` для проверки `CbrfCurrencyProvider`:
+Добавлен модуль `tests/unit/test_currency_provider.py`<!-- Раздел про конфигурацию провайдера перемещён в docs/CURRENCY_PROVIDER.md -->
 
 - Проверяется корректный разбор ответа ЦБ и использование кэша между вызовами (без повторного HTTP-запроса).
 - При отсутствии курса EUR или сетевой ошибке включается безопасный fallback на `FixedCurrencyProvider`.
