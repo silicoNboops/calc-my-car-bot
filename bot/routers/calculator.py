@@ -33,7 +33,7 @@ from bot.keyboards.calculator import (
     format_age_key_title,
 )
 from bot.states import CalculatorState
-from bot.utils.formatting import format_amount, fmt_money
+from bot.utils.formatting import format_amount, fmt_money, format_selection_header
 
 if TYPE_CHECKING:
     from aiogram.types import CallbackQuery, Message
@@ -86,46 +86,7 @@ async def _edit_or_send(message, text: str, reply_markup=None) -> None:
     except TelegramBadRequest:
         await message.answer(text, reply_markup=reply_markup)
 
-
-def _format_selection_header(data: dict, *, age_title: str | None = None) -> str:
-    """Строит заголовок, добавляя только заполненные пункты."""
-    lines: list[str] = ["Выбор сделан:"]
-    vehicle_type = data.get("vehicle_type")
-    vehicle_title = data.get("vehicle_title") or (format_vehicle_title(str(vehicle_type)) if vehicle_type else None)
-    if vehicle_title:
-        lines.append(f"— Тип авто: <b>{vehicle_title}</b>")
-
-    currency = data.get("currency")
-    currency_title = data.get("currency_title") or (format_currency_title(str(currency)) if currency else None)
-    if currency_title:
-        lines.append(f"— Валюта: <b>{currency_title}</b>")
-
-    if (price := data.get("price")):
-        try:
-            price_i = int(price)
-            lines.append(f"— Стоимость: <b>💰 {format_amount(price_i)}</b>")
-        except Exception:
-            pass
-
-    importer_kind = data.get("importer_kind")
-    if importer_kind:
-        lines.append(f"— Кто ввозит: <b>{format_importer_kind_title(str(importer_kind))}</b>")
-
-    engine_type = data.get("engine_type")
-    if engine_type:
-        lines.append(f"— Тип двигателя: <b>{format_engine_type_title(str(engine_type))}</b>")
-
-    engine_cc = data.get("engine_cc")
-    if engine_cc:
-        try:
-            lines.append(f"— Объём: <b>🧱 {format_amount(int(engine_cc))} см³</b>")
-        except Exception:
-            pass
-
-    if age_title:
-        lines.append(f"— Возраст: <b>{age_title}</b>")
-
-    return "\n".join(lines) + "\n\n"
+ 
 
 
  
@@ -140,7 +101,7 @@ async def choose_vehicle_type(call: CallbackQuery, state: FSMContext, callback_d
     # 3) Редактируем текущее сообщение (не создаём новое), показываем клавиатуру валют
     # Показываем заголовок с выбранным типом и просим выбрать валюту
     cur_data = {"vehicle_type": callback_data.type}
-    header = _format_selection_header(cur_data)
+    header = format_selection_header(cur_data)
     await call.message.edit_text(header + "Выберите, в какой валюте будет указана цена автомобиля:", reply_markup=currency_kb())
     await call.answer()
 
@@ -153,7 +114,7 @@ async def choose_currency(call: CallbackQuery, state: FSMContext, callback_data:
     currency_label = format_currency_title(callback_data.code)
     await state.update_data(currency_title=currency_label)
     # Заголовок с авто и валютой, затем просьба ввести цену
-    header = _format_selection_header({**data, "currency": callback_data.code, "currency_title": currency_label})
+    header = format_selection_header({**data, "currency": callback_data.code, "currency_title": currency_label})
     msg = await call.message.edit_text(header + "Введите стоимость автомобиля (например, 💰 1 200 000):", reply_markup=None)
     # Переходим к вводу стоимости и запоминаем id сообщения с промптом
     await state.update_data(prompt_chat_id=msg.chat.id, prompt_message_id=msg.message_id, currency_title=currency_label)
@@ -185,10 +146,7 @@ def _parse_price(raw: str) -> int | None:
         return None
     return value
 
-
-def _format_amount(value: int) -> str:
-    """Форматирует число с пробелами в качестве разделителей тысяч."""
-    return f"{value:,}".replace(",", " ")
+ 
 
 
 @router.message(CalculatorState.PRICE, F.text)
@@ -218,7 +176,7 @@ async def input_price(message: Message, state: FSMContext) -> None:
             else:
                 reason = "Ошибка: стоимость должна быть > 0."
 
-        header = _format_selection_header(data)
+        header = format_selection_header(data)
         error_summary = header + f"<b>— Стоимость: ❌ ОШИБКА</b>\n{reason}"
         if chat_id and msg_id:
             await message.bot.edit_message_text(chat_id=chat_id, message_id=msg_id, text=error_summary)
@@ -228,7 +186,7 @@ async def input_price(message: Message, state: FSMContext) -> None:
 
     # Валидно — сохраняем
     await state.update_data(price=value)
-    header = _format_selection_header({**data, "price": value})
+    header = format_selection_header({**data, "price": value})
     prompt_text = header + "Кто ввозит автомобиль:"
     if chat_id and msg_id:
         await message.bot.edit_message_text(chat_id=chat_id, message_id=msg_id, text=prompt_text,
@@ -258,7 +216,7 @@ async def choose_role(call: CallbackQuery, state: FSMContext, callback_data: Rol
         is_personal_use=is_personal_use,
     )
     data = await state.get_data()
-    prompt_text = _format_selection_header(data) + "Выберите тип двигателя:"
+    prompt_text = format_selection_header(data) + "Выберите тип двигателя:"
     await call.message.edit_text(prompt_text, reply_markup=engine_type_kb())
     await call.answer()
     await state.set_state(CalculatorState.ENGINE_TYPE)
@@ -333,14 +291,14 @@ async def input_engine_cc(message: Message, state: FSMContext) -> None:
     engine_cc_fmt = f"{format_amount(value)} см³"
     if chat_id and msg_id:
         # После ввода объёма предлагаем выбрать возраст авто
-        header2 = _format_selection_header({**data, "engine_cc": value})
+        header2 = format_selection_header({**data, "engine_cc": value})
         prompt_text = header2 + "Выберите возраст автомобиля:"
         try:
             await message.bot.edit_message_text(chat_id=chat_id, message_id=msg_id, text=prompt_text, reply_markup=age_key_kb())
         except TelegramBadRequest:
             await message.answer(prompt_text, reply_markup=age_key_kb())
     else:
-        header2 = _format_selection_header({**data, "engine_cc": value})
+        header2 = format_selection_header({**data, "engine_cc": value})
         await message.answer(header2)
         await message.answer("Выберите возраст автомобиля:", reply_markup=age_key_kb())
     await state.set_state(CalculatorState.AGE_KEY)
@@ -353,11 +311,11 @@ async def choose_age_key(call: CallbackQuery, state: FSMContext, callback_data: 
     vehicle_title = data.get("vehicle_title") or format_vehicle_title(str(data.get("vehicle_type", "")))
     currency_title = data.get("currency_title") or format_currency_title(str(data.get("currency", "")))
     price = int(data.get("price", 0))
-    amount_fmt = _format_amount(price)
+    amount_fmt = format_amount(price)
     importer_title = format_importer_kind_title(str(data.get("importer_kind", "")))
     engine_title = format_engine_type_title(str(data.get("engine_type", "")))
     engine_cc = int(data.get("engine_cc", 0))
-    engine_cc_fmt = f"{_format_amount(engine_cc)} см³" if engine_cc else "—"
+    engine_cc_fmt = f"{format_amount(engine_cc)} см³" if engine_cc else "—"
     age_title = format_age_key_title(callback_data.key)
     # Пакуем пейлоад как для /calc
     payload = {
@@ -389,7 +347,7 @@ async def choose_age_key(call: CallbackQuery, state: FSMContext, callback_data: 
     except Exception:
         fx_line = ""
 
-    header = _format_selection_header(
+    header = format_selection_header(
         {
             "vehicle_title": vehicle_title,
             "vehicle_type": data.get("vehicle_type"),

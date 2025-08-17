@@ -1,5 +1,14 @@
 from __future__ import annotations
 
+from typing import Optional
+
+from bot.keyboards.calculator import (
+    format_age_key_title,  # kept for potential future use
+    format_currency_title,
+    format_engine_type_title,
+    format_importer_kind_title,
+    format_vehicle_title,
+)
 
 def format_amount(value: int) -> str:
     """Форматирует целое число с пробелами как разделителями тысяч.
@@ -16,3 +25,64 @@ def fmt_money(value: float) -> str:
     s = s.replace(",", " ")
     s = s.replace(".", ",")
     return s
+
+
+def format_selection_header(data: dict, *, age_title: Optional[str] = None) -> str:
+    """Строит заголовок выбора для визарда, добавляя только заполненные пункты.
+
+    Ожидаемые ключи:
+    - vehicle_type, vehicle_title
+    - currency, currency_title
+    - price (int)
+    - importer_kind
+    - engine_type
+    - engine_cc (int)
+    - age_title (через аргумент)
+    """
+    lines: list[str] = ["Выбор сделан:"]
+
+    vehicle_type = data.get("vehicle_type")
+    vehicle_title = data.get("vehicle_title") or (
+        format_vehicle_title(str(vehicle_type)) if vehicle_type else None
+    )
+    if vehicle_title:
+        lines.append(f"— Тип авто: <b>{vehicle_title}</b>")
+
+    currency = data.get("currency")
+    currency_title = data.get("currency_title") or (
+        format_currency_title(str(currency)) if currency else None
+    )
+    if currency_title:
+        lines.append(f"— Валюта: <b>{currency_title}</b>")
+
+    price = data.get("price")
+    if price:
+        try:
+            price_i = int(price)
+            lines.append(f"— Стоимость: <b>💰 {format_amount(price_i)}</b>")
+        except Exception:
+            pass
+
+    importer_kind = data.get("importer_kind")
+    if importer_kind:
+        lines.append(
+            f"— Кто ввозит: <b>{format_importer_kind_title(str(importer_kind))}</b>"
+        )
+
+    engine_type = data.get("engine_type")
+    if engine_type:
+        lines.append(
+            f"— Тип двигателя: <b>{format_engine_type_title(str(engine_type))}</b>"
+        )
+
+    engine_cc = data.get("engine_cc")
+    if engine_cc:
+        try:
+            lines.append(f"— Объём: <b>🧱 {format_amount(int(engine_cc))} см³</b>")
+        except Exception:
+            pass
+
+    if age_title:
+        lines.append(f"— Возраст: <b>{age_title}</b>")
+
+    return "\n".join(lines) + "\n\n"
