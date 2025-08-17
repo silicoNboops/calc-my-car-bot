@@ -22,7 +22,7 @@ CBR_CACHE_TTL=3600
 Docker Compose автоматически подставляет переменные окружения из `.env` в контейнер. При желании можно продублировать:
 
 ```yaml
-a pi:
+api:
   environment:
     - CBR_URL=${CBR_URL:-https://www.cbr-xml-daily.ru/daily_json.js}
     - CBR_CACHE_TTL=${CBR_CACHE_TTL:-3600}
