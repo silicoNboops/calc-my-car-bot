@@ -1,8 +1,8 @@
 # quick_tests.py — Быстрые проверки расчётов без интерактива
-# Использует те же классы и ставки, что и CLI в main.py
+# Использует те же классы и ставки, что и CLI в customs_calculator_v1.py
 
 from typing import Dict, Any
-from main import RatesStore, CustomsCalculator
+from customs_calculator_v1 import RatesStore, CustomsCalculator
 
 
 def run_case(calc: CustomsCalculator, case: Dict[str, Any]) -> Dict[str, float]:
