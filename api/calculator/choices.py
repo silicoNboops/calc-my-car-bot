@@ -62,3 +62,10 @@ class UtilFeeKind(models.TextChoices):
     PERSONAL_OLD = "personal_old", "Personal (old)"
     COMMERCIAL_UNDER_3 = "commercial_under_3", "Commercial under 3t"
     COMMERCIAL_OVER_3 = "commercial_over_3", "Commercial over 3t"
+
+
+# Кто ввозит (и цель для физлица). Используется ботом и может применяться в API.
+class ImporterKind(models.TextChoices):
+    JUR = "jur", "Юридическое лицо"
+    PHYS_PERSONAL = "phys_personal", "Физическое лицо (личное пользование)"
+    PHYS_COMMERCIAL = "phys_commercial", "Физическое лицо (продажа)"

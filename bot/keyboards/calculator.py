@@ -4,7 +4,7 @@ from aiogram.filters.callback_data import CallbackData
 from aiogram.types import InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from api.calculator.choices import VehicleType, Currency
+from api.calculator.choices import VehicleType, Currency, ImporterKind
 
 # Человекочитаемые названия валют для отображения в кнопках
 _CURRENCY_TITLES_RU: dict[str, str] = {
@@ -82,24 +82,22 @@ def format_currency_title(code: str) -> str:
 
 # ROLE (кто ввозит): физ/юр
 class RoleCD(CallbackData, prefix="role"):
-    kind: str  # phys | jur
+    kind: str  # jur | phys_personal | phys_commercial
 
 
-_ROLE_TITLES: dict[str, str] = {
-    "phys": "Физическое лицо",
-    "jur": "Юридическое лицо",
-}
+# Базовые подписи берём из ImporterKind.choices, переопределять не нужно
+_ROLE_TITLES: dict[str, str] = dict(ImporterKind.choices)
 
 _ROLE_EMOJI: dict[str, str] = {
-    "phys": "👤",
     "jur": "🏢",
+    "phys_personal": "👤",
+    "phys_commercial": "🛒",
 }
 
 
 def role_kb() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    for kind in ("phys", "jur"):
-        title = _ROLE_TITLES[kind]
+    for kind, title in ImporterKind.choices:
         emoji = _ROLE_EMOJI.get(kind, "")
         text = f"{emoji} {title}".strip()
         builder.button(text=text, callback_data=RoleCD(kind=kind).pack())
@@ -108,6 +106,6 @@ def role_kb() -> InlineKeyboardMarkup:
 
 
 def format_role_title(kind: str) -> str:
-    title = _ROLE_TITLES.get(kind, kind)
+    title = _ROLE_TITLES.get(kind, dict(ImporterKind.choices).get(kind, kind))
     emoji = _ROLE_EMOJI.get(kind, "")
     return f"{emoji} {title}".strip()
