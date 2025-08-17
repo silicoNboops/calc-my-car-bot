@@ -135,7 +135,7 @@ def test_service_matches_endpoint_for_sample_case() -> None:
 
     # Call API
     client = APIClient()
-    url = reverse("calc-estimate")
+    url = reverse("calculator:estimate")
     resp = client.post(url, data=payload, format="json")
     assert resp.status_code == status.HTTP_200_OK, resp.content
     api_data = resp.json()
