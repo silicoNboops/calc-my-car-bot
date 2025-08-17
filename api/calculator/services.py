@@ -20,7 +20,7 @@ from api.calculator.models import (
     DutyUnit,
 )
 
-EngineType = Literal["Бензин", "Дизель"]
+EngineType = Literal["Бензин", "Дизель", "Электро", "Гибрид(послед)", "Гибрид(паралл)"]
 AgeKey = Literal["under_3", "3_to_5", "5_to_7", "over_7", "over_5"]
 Currency = Literal["EUR", "USD", "CNY", "JPY", "KRW", "RUB"]
 
@@ -35,6 +35,9 @@ class EstimateInput:
     age_key: AgeKey = "under_3"
     is_jur: bool = False
     is_personal_use: Optional[bool] = None
+    # Доп. поля для гибридов
+    dvs_hp: Optional[int] = None
+    electric_hp: Optional[int] = None
 
 
 @dataclass
@@ -154,7 +157,7 @@ class CustomsCalculator:
                 row = self._find_bracket(engine_cc, rows, "max_cc")
                 return engine_cc * float(row.get("rate_eur_cc", 0.0))
 
-    def _calc_util(self, is_commercial: bool, age_key: str, engine_cc: int) -> float:
+    def _calc_util(self, is_commercial: bool, age_key: str, engine_cc: int, engine_type: EngineType) -> float:
         # util_base хранится в Settings (fallback к 20000.0 при отсутствии)
         util_base = float(getattr(self.settings, "util_base", 20000.0) or 20000.0)
         if not is_commercial:
@@ -162,6 +165,14 @@ class CustomsCalculator:
             coeff = float(getattr(row, "coeff", 0.0))
             return util_base * coeff
         else:
+            # EV/Hybrid коммерческий: по v2 фиксированные коэффициенты, не зависящие от объёма
+            if engine_type in ("Электро", "Гибрид(послед)", "Гибрид(паралл)"):
+                if age_key == "under_3":
+                    coeff = 1.42  # new_electric/new_hybrid
+                else:
+                    coeff = 2.84  # old_electric/old_hybrid
+                return util_base * coeff
+            # ICE коммерческий: как раньше, по объёму из БД
             group = "commercial_under_3" if age_key == "under_3" else "commercial_over_3"
             rows = list(self.util_fees.filter(kind=group).order_by("max_cc"))
             table = [{"max_cc": float(r.max_cc or float("inf")), "coeff": float(r.coeff)} for r in rows] if rows else []
@@ -170,15 +181,25 @@ class CustomsCalculator:
             row = self._find_bracket(engine_cc, table, "max_cc")
             return util_base * float(row.get("coeff", 0.0))
 
-    def _calc_accise(self, hp: int, is_commercial: bool) -> float:
+    def _calc_accise(self, hp: int, is_commercial: bool, engine_type: EngineType, dvs_hp: Optional[int] = None, electric_hp: Optional[int] = None) -> float:
         if not is_commercial:
             return 0.0
+        # Определяем мощность для расчёта по v2
+        if engine_type == "Электро":
+            power_for_tax = hp
+        elif engine_type == "Гибрид(послед)":
+            power_for_tax = int((dvs_hp or 0) + (electric_hp or 0))
+        elif engine_type == "Гибрид(паралл)":
+            power_for_tax = int(dvs_hp if dvs_hp is not None else int(hp * 0.65))
+        else:
+            power_for_tax = hp
+
         rows = list(self.accise_rates.order_by("max_hp"))
         table = [{"max_hp": float(r.max_hp), "rate": float(r.rate_rub_per_hp)} for r in rows]
         if not table:
             return 0.0
-        row = self._find_bracket(hp, table, "max_hp")
-        return hp * float(row.get("rate", 0.0))
+        row = self._find_bracket(power_for_tax, table, "max_hp")
+        return power_for_tax * float(row.get("rate", 0.0))
 
     def _calc_vat(self, price_rub: float, duty_rub: float, accise_rub: float, is_commercial: bool) -> float:
         if not is_commercial:
@@ -204,11 +225,37 @@ class CustomsCalculator:
 
         is_commercial = data.is_jur or (data.is_personal_use is False)
 
-        duty_eur = self._calc_duty(price_eur, int(data.engine_cc), data.age_key, data.is_jur, data.engine_type)
+        # Пошлина: расширение для EV/гибридов по v2
+        if not data.is_jur:
+            # ФЛ: для EV/гибридов льготы
+            if data.engine_type in ("Электро", "Гибрид(послед)", "Гибрид(паралл)"):
+                if data.age_key == "under_3":
+                    rate = 0.15
+                    min_eur_cc = 0.0
+                    duty_from_price = price_eur * rate
+                    duty_from_volume = int(data.engine_cc) * min_eur_cc
+                    duty_eur = max(duty_from_price, duty_from_volume)
+                else:
+                    rate_eur_cc = 1.0
+                    duty_eur = int(data.engine_cc) * rate_eur_cc
+            else:
+                duty_eur = self._calc_duty(price_eur, int(data.engine_cc), data.age_key, data.is_jur, data.engine_type)
+        else:
+            # ЮЛ: EV/гибриды по v2, иначе текущие правила из БД
+            if data.engine_type == "Электро":
+                # 0.15 без минимума, new/old одинаково
+                duty_eur = price_eur * 0.15
+            elif data.engine_type in ("Гибрид(послед)", "Гибрид(паралл)"):
+                is_new = (data.age_key == "under_3")
+                rate = 0.15 if is_new else 0.18
+                min_eur_cc = 0.30 if is_new else 1.20
+                duty_eur = max(price_eur * rate, int(data.engine_cc) * min_eur_cc)
+            else:
+                duty_eur = self._calc_duty(price_eur, int(data.engine_cc), data.age_key, data.is_jur, data.engine_type)
         duty_rub = duty_eur * float(fx.get("EUR", 1.0))
 
-        util_fee = self._calc_util(is_commercial, data.age_key, int(data.engine_cc))
-        accise_rub = self._calc_accise(int(data.hp), is_commercial)
+        util_fee = self._calc_util(is_commercial, data.age_key, int(data.engine_cc), data.engine_type)
+        accise_rub = self._calc_accise(int(data.hp), is_commercial, data.engine_type, data.dvs_hp, data.electric_hp)
         vat_rub = self._calc_vat(price_rub, duty_rub, accise_rub, is_commercial)
         # Таможенный сбор: для физлиц при личном использовании фиксировано 500 ₽ (v2)
         if not is_commercial:
