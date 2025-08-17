@@ -98,7 +98,7 @@ def test_serializer_normalizes_phys_over7_to_over5() -> None:
 ])
 def test_estimate_endpoint_smoke(case: dict) -> None:
     client = APIClient()
-    url = reverse("calc-estimate")
+    url = reverse("calculator:estimate")
     resp = client.post(url, data=case["payload"], format="json")
     assert resp.status_code == status.HTTP_200_OK, resp.content
     data = resp.json()
