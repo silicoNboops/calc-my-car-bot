@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-from aiogram.utils.keyboard import ReplyKeyboardBuilder
-from aiogram.types import ReplyKeyboardMarkup
+from aiogram.types import InlineKeyboardMarkup
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-
-def start_menu_kb() -> ReplyKeyboardMarkup:
-    builder = ReplyKeyboardBuilder()
-    # Кнопки как на скрине: по одной в ряд
-    builder.button(text="Рассчитать пошлину")
-    builder.button(text="Получить курсы валют")
-    builder.button(text="Оставить заявку")
+def inline_start_menu_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    # Кнопки: одна в ряд
+    builder.button(text="Рассчитать пошлину", callback_data="start:calc")
+    builder.button(text="Получить курсы валют", callback_data="start:rates")
+    builder.button(text="Оставить заявку", callback_data="start:lead")
     builder.adjust(1)
-    return builder.as_markup(resize_keyboard=True, one_time_keyboard=False)
+    return builder.as_markup()

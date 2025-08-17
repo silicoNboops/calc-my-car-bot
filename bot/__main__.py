@@ -10,7 +10,7 @@ from aiogram.types import BotCommand
 
 from api.config.logging import LOGGING
 from bot.config.bot import RUNNING_MODE, TELEGRAM_API_TOKEN, RunningMode
-from bot.handlers import router
+from bot.routers import router
 
 logging.config.dictConfig(LOGGING)
 logger = logging.getLogger(__name__)
