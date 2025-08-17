@@ -154,13 +154,13 @@ def test_boundary_customs_fee_exact_max_value_rub() -> None:
     )
     assert resp.status_code == status.HTTP_200_OK, resp.content
     data = resp.json()
-    # Для физлиц (личное использование) по v2 фиксированный таможенный сбор 500 ₽
-    assert pytest.approx(data["customs_fee"], rel=1e-6) == 500.0
+    # По v3 таможенный сбор всегда по таблице ПП РФ №1637 (берём ровно граничное значение)
+    assert pytest.approx(data["customs_fee"], rel=1e-6) == float(fee_row.fee_rub)
 
 
 @pytest.mark.django_db()
-def test_ev_phys_under3_basic_v2_rules() -> None:
-    """Физлицо, электро, <3 лет: duty = 15% от цены (EUR), accise=0, VAT=0, util=3400, customs_fee=500."""
+def test_ev_phys_under3_basic_v3_rules() -> None:
+    """Физлицо, электро, <3 лет: duty = 15% от цены (EUR), accise=0, VAT=0, util=3400, customs_fee — по таблице."""
     client = APIClient()
     payload = {
         "price": 20000.0,  # EUR
@@ -182,8 +182,18 @@ def test_ev_phys_under3_basic_v2_rules() -> None:
     # accise и VAT = 0 для физ личного использования
     assert data["accise_rub"] == 0.0
     assert data["vat_rub"] == 0.0
-    # customs_fee = 500
-    assert data["customs_fee"] == 500.0
+    # customs_fee — по таблице ПП РФ №1637 в зависимости от price_rub
+    rows = list(CustomsFee.objects.order_by("max_value_rub"))
+    assert rows, "CustomsFee fixtures must be present"
+    price_rub = float(data["price_rub"])  # используем значение из ответа API
+    expected_fee = None
+    for r in rows:
+        if price_rub <= float(r.max_value_rub):
+            expected_fee = float(r.fee_rub)
+            break
+    if expected_fee is None:
+        expected_fee = float(rows[-1].fee_rub)
+    assert pytest.approx(data["customs_fee"], rel=1e-6) == expected_fee
 
 
 @pytest.mark.django_db()
@@ -216,7 +226,7 @@ def test_hybrid_parallel_jur_over5_min_rule() -> None:
 
 @pytest.mark.django_db()
 def test_ev_phys_over5_rules() -> None:
-    """Физлицо, электро, >=3 лет: duty = 1 EUR/см³; VAT=0; accise=0; util=5200; customs_fee=500."""
+    """Физлицо, электро, >=3 лет: duty = 1 EUR/см³; VAT=0; accise=0; util=5200; customs_fee — по таблице."""
     client = APIClient()
     payload = {
         "price": 10000.0,
@@ -237,7 +247,18 @@ def test_ev_phys_over5_rules() -> None:
     assert pytest.approx(data["util_fee"], rel=1e-6) == 5200.0
     assert data["accise_rub"] == 0.0
     assert data["vat_rub"] == 0.0
-    assert data["customs_fee"] == 500.0
+    # customs_fee — по таблице ПП РФ №1637 в зависимости от price_rub
+    rows = list(CustomsFee.objects.order_by("max_value_rub"))
+    assert rows, "CustomsFee fixtures must be present"
+    price_rub = float(data["price_rub"])  # используем значение из ответа API
+    expected_fee = None
+    for r in rows:
+        if price_rub <= float(r.max_value_rub):
+            expected_fee = float(r.fee_rub)
+            break
+    if expected_fee is None:
+        expected_fee = float(rows[-1].fee_rub)
+    assert pytest.approx(data["customs_fee"], rel=1e-6) == expected_fee
 
 
 @pytest.mark.django_db()
