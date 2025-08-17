@@ -16,6 +16,7 @@ from bot.keyboards.calculator import (
     role_kb,
     format_role_title,
 )
+from api.calculator.choices import ImporterKind
 from bot.states import CalculatorState
 
 if TYPE_CHECKING:
@@ -154,13 +155,29 @@ async def input_price(message: Message, state: FSMContext) -> None:
 
 @router.callback_query(CalculatorState.ROLE, RoleCD.filter())
 async def choose_role(call: CallbackQuery, state: FSMContext, callback_data: RoleCD) -> None:
-    await state.update_data(importer_kind=callback_data.kind)
+    kind = callback_data.kind
+    # Маппинг в сервисные флаги: is_jur и is_personal_use
+    if kind == ImporterKind.JUR:
+        is_jur = True
+        is_personal_use = None
+    elif kind == ImporterKind.PHYS_PERSONAL:
+        is_jur = False
+        is_personal_use = True
+    else:  # ImporterKind.PHYS_COMMERCIAL
+        is_jur = False
+        is_personal_use = False
+
+    await state.update_data(
+        importer_kind=kind,
+        is_jur=is_jur,
+        is_personal_use=is_personal_use,
+    )
     data = await state.get_data()
     vehicle_title = data.get("vehicle_title") or format_vehicle_title(str(data.get("vehicle_type", "")))
     currency_title = data.get("currency_title") or format_currency_title(str(data.get("currency", "")))
     price = int(data.get("price", 0))
     amount_fmt = _format_amount(price)
-    role_title = format_role_title(callback_data.kind)
+    role_title = format_role_title(kind)
     await call.message.edit_text(
         (
             "Выбор сделан:\n"
