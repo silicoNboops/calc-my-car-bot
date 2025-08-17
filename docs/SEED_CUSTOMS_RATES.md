@@ -20,6 +20,15 @@ ENVIRONMENT=production python manage.py seed_customs_rates --path api/calculator
 ENVIRONMENT=production python manage.py seed_customs_rates --path api/calculator/fixtures
 ```
 
+Вариант через Docker:
+```bash
+docker compose exec \
+  -e ENVIRONMENT=production \
+  api python manage.py seed_customs_rates \
+  --path api/calculator/fixtures \
+  --version-tag 2025_08_16
+```
+
 ## Формат JSON
 
 Ожидается объединяемая структура (ключи опциональны, кроме массивов, которые могут быть пустыми):
