@@ -66,6 +66,6 @@ class UtilFeeKind(models.TextChoices):
 
 # Кто ввозит (и цель для физлица). Используется ботом и может применяться в API.
 class ImporterKind(models.TextChoices):
-    JUR = "jur", "Юридическое лицо"
     PHYS_PERSONAL = "phys_personal", "Физическое лицо (личное пользование)"
     PHYS_COMMERCIAL = "phys_commercial", "Физическое лицо (продажа)"
+    JUR = "jur", "Юридическое лицо"

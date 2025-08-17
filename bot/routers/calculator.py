@@ -154,7 +154,7 @@ async def input_price(message: Message, state: FSMContext) -> None:
 
 @router.callback_query(CalculatorState.ROLE, RoleCD.filter())
 async def choose_role(call: CallbackQuery, state: FSMContext, callback_data: RoleCD) -> None:
-    await state.update_data(role=callback_data.kind)
+    await state.update_data(importer_kind=callback_data.kind)
     data = await state.get_data()
     vehicle_title = data.get("vehicle_title") or format_vehicle_title(str(data.get("vehicle_type", "")))
     currency_title = data.get("currency_title") or format_currency_title(str(data.get("currency", "")))
