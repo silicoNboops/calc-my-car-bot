@@ -140,6 +140,9 @@ cython_debug/
 # PyCharm
 .idea
 
+# Runtime markers (created by Docker entrypoint)
+.dev_deps_installed
+
 tmp/
 media/
 staticfiles/
