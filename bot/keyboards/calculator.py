@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from aiogram.filters.callback_data import CallbackData
 from aiogram.types import InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from api.calculator.choices import VehicleType
 
 
 @dataclass
@@ -14,11 +15,8 @@ class VehicleTypeCD(CallbackData, prefix="veh"):
 
 def vehicle_type_kb() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    # Идентификаторы строго соответствуют VehicleType в api.calculator.services:
-    # ["car", "quad", "snowmobile", "motorcycle"]
-    builder.button(text="Легковой", callback_data=VehicleTypeCD(type="car").pack())
-    builder.button(text="Снегоход", callback_data=VehicleTypeCD(type="snowmobile").pack())
-    builder.button(text="Квадроцикл", callback_data=VehicleTypeCD(type="quad").pack())
-    builder.button(text="Мотоцикл", callback_data=VehicleTypeCD(type="motorcycle").pack())
+    # Строим кнопки из единого источника истины — Django TextChoices
+    for value, label in VehicleType.choices:
+        builder.button(text=str(label), callback_data=VehicleTypeCD(type=str(value)).pack())
     builder.adjust(1)
     return builder.as_markup()
