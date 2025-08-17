@@ -20,7 +20,7 @@ class EstimateView(APIView):
     из legacy будет возвращаться рассчитанный ответ.
     """
 
-    def post(self, request: "Request", *_args: Any, **_kwargs: Any) -> Response:  # type: ignore[override]
+    def post(self, request: Request, *_args: Any, **_kwargs: Any) -> Response:  # type: ignore[override]
         serializer = EstimateRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data

@@ -14,7 +14,7 @@ from api.calculator.models import DutyRate, UtilFee, AcciseRate, CustomsFee, Set
 class Command(BaseCommand):
     help = "Seed customs rates from fixtures JSON files into the database."
 
-    def add_arguments(self, parser):  # type: ignore[override]
+    def add_arguments(self, parser: Any) -> None:  # type: ignore[override]
         parser.add_argument(
             "--path",
             type=str,
@@ -39,7 +39,7 @@ class Command(BaseCommand):
             help="Optional version tag to filter files, e.g., 2025_08_16.",
         )
 
-    def handle(self, *args, **options):  # type: ignore[override]
+    def handle(self, *_args: Any, **options: Any) -> None:  # type: ignore[override]
         fixtures_dir = Path(options["path"]).expanduser().resolve()
         version_tag = options["version_tag"]
         dry_run = options["dry_run"]
@@ -48,13 +48,15 @@ class Command(BaseCommand):
         # Защита от загрузки шаблонных фикстур в проде: требуем явный --version-tag
         env = getattr(settings, "ENVIRONMENT", "local").lower()
         if env in {"production", "prod"} and not version_tag:
-            raise CommandError(
+            msg = (
                 "Refusing to seed rates in production without --version-tag. "
                 "Run with explicit --version-tag=<release_tag>."
             )
+            raise CommandError(msg)
 
         if not fixtures_dir.exists() or not fixtures_dir.is_dir():
-            raise CommandError(f"Fixtures directory not found: {fixtures_dir}")
+            msg = f"Fixtures directory not found: {fixtures_dir}"
+            raise CommandError(msg)
 
         files = sorted(fixtures_dir.glob("*.json"))
         if version_tag:
@@ -71,7 +73,7 @@ class Command(BaseCommand):
                 with p.open("r", encoding="utf-8") as f:
                     payloads.append(json.load(f))
                 self.stdout.write(f"  - {p.name} [loaded]")
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 msg = f"Invalid JSON in {p.name}: {e}"
                 raise CommandError(msg) from e
 

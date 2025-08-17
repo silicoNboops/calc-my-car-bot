@@ -86,6 +86,18 @@ required-imports = ["from __future__ import annotations"]
 "api/calculator/serializers.py" = [
     "RUF003", # ambiguous unicode in comments (русский текст)
 ]
+"api/calculator/models.py" = [
+    "RUF012", # ClassVar for Django Meta inner classes and attributes
+]
+"api/calculator/management/commands/seed_customs_rates.py" = [
+    "PERF203", # try/except in loop is acceptable for small fixture lists
+    "I001",    # import order noise (Django mgmt module style)
+    "C901",    # function too complex (handle)
+    "PLR0912", # too many branches (handle)
+    "PLR0915", # too many statements (handle)
+    "ANN201",  # missing return type (overridden methods)
+    "ANN001",  # missing type annotation for function argument
+]
 
 [tool.mypy]
 python_version = "3.12"
