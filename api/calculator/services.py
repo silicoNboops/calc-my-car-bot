@@ -82,6 +82,13 @@ class CustomsCalculator:
     def _collect_duty_rows(self, audience: str, age_group: str) -> list[dict]:
         rows: list[dict] = []
         qs = self.duty_rates.filter(audience=audience, age_group=age_group).order_by("max_value")
+        # Фильтруем неподходящие единицы измерения для конкретных схем расчёта,
+        # чтобы исключить "зашумление" данными (например, PERCENT для phys under_3).
+        if audience == Audience.PASSENGER_CAR_PHYS:
+            if age_group == AgeGroup.UNDER_3:
+                qs = qs.filter(unit=DutyUnit.VALUE)
+            else:
+                qs = qs.filter(unit=DutyUnit.EUR_CC)
         for r in qs:
             if r.unit == DutyUnit.EUR_CC:
                 rows.append({"max_cc": r.max_value or float("inf"), "rate_eur_cc": float(r.rate_eur_cc or 0.0)})
