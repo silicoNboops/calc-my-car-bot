@@ -1,6 +1,9 @@
 services:
   api:
-    build: .
+    build:
+      context: .
+      args:
+        INSTALL_DEV_ENV: ${ENVIRONMENT:-production}
     environment:
       ENVIRONMENT: ${ENVIRONMENT:-production}
       WORKERS: ${WORKERS:-2}

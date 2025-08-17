@@ -36,14 +36,15 @@ PY
       if [ "$REQ_HASH" = "$MARKER_HASH" ] && [ "$PY_VER" = "$MARKER_PY" ] && [ "$PIP_VER" = "$MARKER_PIP" ]; then
         # Sanity check: ensure at least one dev package from requirements-dev.txt is really importable.
         # This covers cases after image rebuild when site-packages are fresh but marker remains in volume.
-        if python - <<'PY'
+        CHECK_OUT=$(python - <<'PY'
 try:
     import pytest  # sentinel dev dep
     print('OK')
 except Exception:
     print('MISS')
 PY
-        | grep -q 'OK'; then
+)
+        if echo "$CHECK_OUT" | grep -q 'OK'; then
           NEED_INSTALL=0
           echo "[entrypoint] Dev dependencies up-to-date (marker checksum matches). Skipping."
         else
