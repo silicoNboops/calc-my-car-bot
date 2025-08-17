@@ -8,6 +8,7 @@ include(
     "application.py",
     "auth.py",
     "database.py",
+    "currency.py",
     "security.py",
     "storage.py",
     "rest.py",
