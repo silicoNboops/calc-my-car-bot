@@ -154,7 +154,8 @@ def test_boundary_customs_fee_exact_max_value_rub() -> None:
     )
     assert resp.status_code == status.HTTP_200_OK, resp.content
     data = resp.json()
-    assert pytest.approx(data["customs_fee"], rel=1e-6) == float(fee_row.fee_rub)
+    # Для физлиц (личное использование) по v2 фиксированный таможенный сбор 500 ₽
+    assert pytest.approx(data["customs_fee"], rel=1e-6) == 500.0
 
 
 @pytest.mark.django_db()
