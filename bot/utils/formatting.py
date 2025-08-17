@@ -1,15 +1,16 @@
 from __future__ import annotations
 
-from typing import Optional
 import re
+from typing import Optional
 
 from bot.keyboards.calculator import (
-    format_age_key_title,  # kept for potential future use
+    # kept for potential future use
     format_currency_title,
     format_engine_type_title,
     format_importer_kind_title,
     format_vehicle_title,
 )
+
 
 def format_amount(value: int) -> str:
     """Форматирует целое число с пробелами как разделителями тысяч.
@@ -82,7 +83,6 @@ def format_selection_header(data: dict, *, age_title: Optional[str] = None) -> s
             lines.append(f"— Объём: <b>🧱 {format_amount(int(engine_cc))} см³</b>")
         except Exception:
             pass
-
 
     if age_title:
         lines.append(f"— Возраст: <b>{age_title}</b>")

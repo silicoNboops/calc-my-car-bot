@@ -20,11 +20,11 @@ START_LEAD_SOON = "Форму заявки скоро добавлю"
 # /calc команда — подсказки/ошибки
 CALC_USAGE_EXAMPLE = "/calc 20000 EUR 1999 150 Бензин under_3 phys personal"
 CALC_USAGE_HELP = (
-    "Неверный формат. Пример: \n" + CALC_USAGE_EXAMPLE
+        "Неверный формат. Пример: \n" + CALC_USAGE_EXAMPLE
 )
 CALC_PARSE_ERROR = (
-    "Не удалось распарсить аргументы. Пример: \n" + CALC_USAGE_EXAMPLE
+        "Не удалось распарсить аргументы. Пример: \n" + CALC_USAGE_EXAMPLE
 )
 CALC_EMPTY_MESSAGE = (
-    "Сообщение пустое. Пример: " + CALC_USAGE_EXAMPLE
+        "Сообщение пустое. Пример: " + CALC_USAGE_EXAMPLE
 )

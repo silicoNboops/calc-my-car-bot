@@ -93,9 +93,6 @@ def _estimate_sync(payload: dict) -> str:
     return _format_result(res)
 
 
- 
-
-
 @router.message(Command(commands=["calc"]))
 async def handle_calc_command(message: Message, state: FSMContext) -> None:
     # Сброс состояния визарда при вызове /calc
