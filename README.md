@@ -179,3 +179,21 @@ By following this guide and utilizing the advanced features, you'll be able to s
      ```bash
      docker compose up -d
      ```
+
+---
+
+## Калькулятор v3 — ключевые изменения
+
+- Таможенный сбор всегда по таблице `CustomsFee` (ПП РФ №1637), без фиксированных 500 ₽ для ФЛ.
+- Акциз — только для легковых (`vehicle_type == "car"`); для прочих ТС (quad/snowmobile/motorcycle) — 0.
+- Провайдер валют выбирается через `get_default_currency_provider()`:
+  - `USE_FIXED_CURRENCY_PROVIDER=true` — фиксированные курсы (CI/оффлайн).
+  - Иначе: ЦБ РФ, параметры в Django settings: `CBR_URL`, `CBR_CACHE_TTL`.
+
+## Тесты (локально)
+
+Рекомендуемый запуск с SQLite in-memory и фиксированным провайдером валют:
+
+```bash
+USE_TEST_DB=1 TEST_DATABASE_URL=sqlite://:memory: USE_FIXED_CURRENCY_PROVIDER=true .venv/bin/python -m pytest -q
+```

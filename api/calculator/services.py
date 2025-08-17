@@ -291,13 +291,14 @@ class CustomsCalculator:
         duty_rub = duty_eur * float(fx.get("EUR", 1.0))
 
         util_fee = self._calc_util(is_commercial, data.age_key, int(data.engine_cc), data.engine_type, data.vehicle_type)
-        accise_rub = self._calc_accise(int(data.hp), is_commercial, data.engine_type, data.dvs_hp, data.electric_hp)
-        vat_rub = self._calc_vat(price_rub, duty_rub, accise_rub, is_commercial)
-        # Таможенный сбор: для физлиц при личном использовании фиксировано 500 ₽ (v2)
-        if not is_commercial:
-            customs_fee = 500.0
+        # Акциз по v3: только для легковых автомобилей, для прочих ТС не применяется
+        if data.vehicle_type == "car":
+            accise_rub = self._calc_accise(int(data.hp), is_commercial, data.engine_type, data.dvs_hp, data.electric_hp)
         else:
-            customs_fee = self._calc_customs_fee(price_rub)
+            accise_rub = 0.0
+        vat_rub = self._calc_vat(price_rub, duty_rub, accise_rub, is_commercial)
+        # Таможенный сбор по v3: всегда по таблице ПП РФ №1637
+        customs_fee = self._calc_customs_fee(price_rub)
 
         subtotal_customs = duty_rub + util_fee + accise_rub + vat_rub + customs_fee
 

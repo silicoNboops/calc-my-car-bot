@@ -16,4 +16,20 @@
   - `is_personal_use: bool`
 - Ответ (см. `EstimateResponseSerializer`).
 
-Примечание: провайдер валют выбирается фабрикой `get_default_currency_provider()` (см. `api/calculator/services.py`). Конфигурация провайдера описана в `docs/CURRENCY_PROVIDER.md`.
+### Примечания по версии калькулятора (v3)
+
+- Текущая референсная версия логики — v3.
+- Таможенный сбор всегда рассчитывается по таблице `CustomsFee` (ПП РФ №1637) вне зависимости от статуса ФЛ/ЮЛ.
+- Акциз начисляется только для легковых авто (`vehicle_type == "car"`). Для `quad`/`snowmobile`/`motorcycle` акциз = 0.
+- Утильсбор соответствует ранее принятой схеме: база берётся из `Settings.util_base`, для не-легковых применяется множитель 8.625 и коэффициенты согласно текущим правилам.
+
+### Провайдер валют
+
+Провайдер валют выбирается фабрикой `get_default_currency_provider()` (см. `api/calculator/services.py`). Конфигурация:
+
+- `USE_FIXED_CURRENCY_PROVIDER=true` — включает фиксированные курсы (для CI/оффлайн).
+- Иначе используется провайдер ЦБ РФ с параметрами из Django settings:
+  - `CBR_URL`
+  - `CBR_CACHE_TTL`
+
+Подробнее см. `docs/CURRENCY_PROVIDER.md`.
