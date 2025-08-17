@@ -89,3 +89,24 @@ class CalculatorService:
             "customs_fee": CustomsFee.objects.all(),
         }
         return CustomsCalculator(rates=rates, settings=settings, currency_rates=currency_rates)
+
+
+class FixedCurrencyProvider(CurrencyProvider):
+    """Временный провайдер курсов валют: фиксированные значения.
+
+    EUR = 1.0, остальные заданы приблизительно и должны быть заменены
+    реальным провайдером (ЦБ РФ или другой источник) на следующем шаге.
+    """
+
+    def __init__(self, rates: dict[str, float] | None = None) -> None:
+        self._rates = rates or {
+            "EUR": 1.0,
+            "USD": 0.92,
+            "CNY": 7.10,
+            "JPY": 160.0,
+            "KRW": 1480.0,
+            "RUB": 100.0,
+        }
+
+    def get_rates(self) -> dict[str, float]:
+        return dict(self._rates)
