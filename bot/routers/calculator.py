@@ -5,17 +5,17 @@ from typing import TYPE_CHECKING
 from aiogram import Router
 from aiogram.filters import Command
 from asgiref.sync import sync_to_async
+
 from api.calculator.services import (
     CalculatorService,
-    get_default_currency_provider,
     EstimateInput,
+    get_default_currency_provider,
 )
 
 if TYPE_CHECKING:
     from aiogram.types import Message
 
 router = Router()
-
 
 
 def _parse_calc_args(text: str) -> dict | str:
@@ -84,7 +84,7 @@ def _format_result(res) -> str:  # type: ignore[no-untyped-def]
     )
 
 
-def _estimate_sync(payload: dict) -> dict:
+def _estimate_sync(payload: dict) -> str:
     """Синхронная часть: берёт ORM-данные и считает результат."""
     service = CalculatorService(currency_provider=get_default_currency_provider())
     calc = service.build_calculator()
@@ -95,7 +95,9 @@ def _estimate_sync(payload: dict) -> dict:
 @router.message(Command(commands=["calc"]))
 async def handle_calc_command(message: Message) -> None:
     if message.text is None:
-        await message.answer("Сообщение пустое. Пример: /calc 20000 EUR 1999 150 Бензин under_3 phys personal")
+        await message.answer(
+            "Сообщение пустое. Пример: /calc 20000 EUR 1999 150 Бензин under_3 phys personal"
+        )
         return
 
     parsed = _parse_calc_args(message.text)
@@ -104,7 +106,6 @@ async def handle_calc_command(message: Message) -> None:
         return
 
     try:
-        # Важно: доступ к ORM обёрнут через sync_to_async
         result_text = await sync_to_async(_estimate_sync)(parsed)
         await message.answer(result_text)
     except Exception as e:  # noqa: BLE001
