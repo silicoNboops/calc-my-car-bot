@@ -12,6 +12,7 @@ from api.calculator.services import (
     get_default_currency_provider,
     EstimateInput,
 )
+from bot.keyboards.start import start_menu_kb
 
 if TYPE_CHECKING:
     from aiogram.types import Message
@@ -32,11 +33,13 @@ async def handle_start_command(message: Message) -> None:
             "last_name": message.from_user.last_name,
         },
     )
-
-    if is_new:
-        await message.answer("You have successfully registered in the bot!")
-    else:
-        await message.answer("You are already registered in the bot!")
+    # Приветствие + стартовое меню
+    # Требование: "Вас приветствует ChinaMotorsBot!" и кнопки как на скрине
+    base = "Вас приветствует ChinaMotorsBot!"
+    extra = (
+        "\nВы успешно зарегистрированы в боте." if is_new else "\nРады видеть вас снова."
+    )
+    await message.answer(base + extra, reply_markup=start_menu_kb())
 
 
 @router.message(Command(commands=["id"]))
