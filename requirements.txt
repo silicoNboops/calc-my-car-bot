@@ -22,3 +22,4 @@ python-dotenv==1.1.1
 pytz==2025.2
 redis==6.4.0
 sentry-sdk==2.35.0
+requests>=2.31.0
