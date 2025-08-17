@@ -80,4 +80,3 @@ docker compose exec \
 
 - Конфигурация pytest: `pyproject.toml` → `[tool.pytest.ini_options]`.
 - Основная настройка БД: `api/config/database.py`.
-- Эндпоинт расчёта: `api/calculator/views.py` (`name="estimate"`, namespace `calculator`).
