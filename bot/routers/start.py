@@ -4,9 +4,12 @@ from typing import TYPE_CHECKING
 
 from aiogram import Router, F
 from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
 
 from api.user.models import User
 from bot.keyboards.start import inline_start_menu_kb
+from bot.keyboards.calculator import vehicle_type_kb
+from bot.states import CalculatorState
 
 if TYPE_CHECKING:
     from aiogram.types import Message, CallbackQuery
@@ -47,10 +50,12 @@ async def handle_id_command(message: Message) -> None:
 
 # Inline-кнопки стартового меню (заглушки)
 @router.callback_query(F.data == "start:calc")
-async def cb_start_calc(call: CallbackQuery) -> None:
-    await call.message.edit_text(
-        "Запускаем мастер расчёта… (скоро подключу визард)",
-        reply_markup=None,
+async def cb_start_calc(call: CallbackQuery, state: FSMContext) -> None:
+    # Запуск визарда: устанавливаем состояние выбора типа ТС
+    await state.set_state(CalculatorState.VEHICLE_TYPE)
+    await call.message.answer(
+        "Выберите тип автомобиля:",
+        reply_markup=vehicle_type_kb(),
     )
     await call.answer()
 
