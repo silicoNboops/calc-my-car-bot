@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import requests
-from typing import Literal, Optional
+from typing import Optional
 import os
 
 from django.core.cache import cache
@@ -16,17 +16,22 @@ from api.calculator.models import (
     DutyRate,
     Settings,
     UtilFee,
+)
+from api.calculator.choices import (
+    EngineType as EngineTypeChoices,
+    VehicleType as VehicleTypeChoices,
     Audience,
     AgeGroup,
     DutyUnit,
+    Currency as CurrencyChoices,
+    AgeKey as AgeKeyChoices,
 )
-from api.calculator.choices import EngineType as EngineTypeChoices, VehicleType as VehicleTypeChoices
 
 # Используем Django TextChoices как единый источник истины.
 EngineType = EngineTypeChoices
 VehicleType = VehicleTypeChoices
-AgeKey = Literal["under_3", "3_to_5", "5_to_7", "over_7", "over_5"]
-Currency = Literal["EUR", "USD", "CNY", "JPY", "KRW", "RUB"]
+AgeKey = AgeKeyChoices
+Currency = CurrencyChoices
 
 
 @dataclass
@@ -37,7 +42,7 @@ class EstimateInput:
     hp: int
     vehicle_type: VehicleType = VehicleTypeChoices.CAR
     engine_type: EngineType = EngineTypeChoices.BENZIN
-    age_key: AgeKey = "under_3"
+    age_key: AgeKey = AgeKeyChoices.UNDER_3
     is_jur: bool = False
     is_personal_use: Optional[bool] = None
     # Доп. поля для гибридов

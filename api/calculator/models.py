@@ -1,26 +1,8 @@
 from __future__ import annotations
 
 from django.db import models
+from api.calculator.choices import Audience, AgeGroup, DutyUnit, UtilFeeKind
 
-
-class Audience(models.TextChoices):
-    PASSENGER_CAR_PHYS = "PASSENGER_CAR_PHYS", "Passenger Car (Physical Person)"
-    PASSENGER_CAR_JUR_BENZ = "PASSENGER_CAR_JUR_BENZ", "Passenger Car (Legal, Petrol)"
-    PASSENGER_CAR_JUR_DIESEL = "PASSENGER_CAR_JUR_DIESEL", "Passenger Car (Legal, Diesel)"
-
-
-class AgeGroup(models.TextChoices):
-    UNDER_3 = "under_3_years", "Under 3 years"
-    FROM_3_TO_5 = "3_to_5_years", "3 to 5 years"
-    FROM_5_TO_7 = "5_to_7_years", "5 to 7 years"
-    OVER_7 = "over_7_years", "Over 7 years"
-    OVER_5 = "over_5_years", "Over 5 years"
-
-
-class DutyUnit(models.TextChoices):
-    EUR_CC = "eur_cc", "EUR per cc"
-    PERCENT = "percent", "% of price"
-    VALUE = "value", "Price bracket (EUR)"
 
 
 class DutyRate(models.Model):
@@ -63,13 +45,6 @@ class DutyRate(models.Model):
 
     def __str__(self) -> str:  # pragma: no cover - admin/debug
         return f"{self.audience} {self.age_group} {self.unit} <= {self.max_value}"
-
-
-class UtilFeeKind(models.TextChoices):
-    PERSONAL_NEW = "personal_new", "Personal (new)"
-    PERSONAL_OLD = "personal_old", "Personal (old)"
-    COMMERCIAL_UNDER_3 = "commercial_under_3", "Commercial under 3t"
-    COMMERCIAL_OVER_3 = "commercial_over_3", "Commercial over 3t"
 
 
 class UtilFee(models.Model):
