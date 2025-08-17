@@ -45,6 +45,27 @@ docker compose exec \
 - `USE_FIXED_CURRENCY_PROVIDER=1` принудительно включает фиксированный провайдер валют, чтобы тесты были детерминированными и не зависели от сети/ЦБ РФ. Для проверки реального провайдера уберите флаг, но такие прогоны могут быть нестабильными офлайн.
 - В smoke-режиме SQLite in-memory даёт максимальную скорость. В Postgres-режиме проверяются миграции, последовательности и колляции.
 
+### Примеры без `USE_FIXED_CURRENCY_PROVIDER=1`
+
+- Postgres (реальный провайдер курсов, нужен доступ в интернет):
+
+```bash
+docker compose exec \
+  -e DATABASE_URL=postgres://postgres:lolgrec@db:5432/postgres \
+  api python -m pytest -q
+```
+
+- SQLite in-memory (smoke, реальный провайдер курсов, нужен интернет):
+
+```bash
+docker compose exec \
+  -e USE_TEST_DB=1 \
+  -e TEST_DATABASE_URL=sqlite:///:memory: \
+  api python -m pytest -q
+```
+
+Замечание: юнит-тесты провайдера (`tests/unit/test_currency_provider.py`) мокают сеть и стабильны в любом режиме; без флага реальные сетевые обращения делает сервис в интеграционных местах (например, при сборке калькулятора).
+
 - Прогон с отчётом покрытия (пример на SQLite in-memory):
 
 ```bash
