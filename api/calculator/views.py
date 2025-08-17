@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.calculator.serializers import EstimateRequestSerializer, EstimateResponseSerializer
-from api.calculator.services import CalculatorService, EstimateInput, CbrfCurrencyProvider
+from api.calculator.services import CalculatorService, EstimateInput, get_default_currency_provider
 
 
 class EstimateView(APIView):
@@ -20,7 +20,7 @@ class EstimateView(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        service = CalculatorService(currency_provider=CbrfCurrencyProvider())
+        service = CalculatorService(currency_provider=get_default_currency_provider())
         calculator = service.build_calculator()
 
         try:

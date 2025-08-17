@@ -315,3 +315,14 @@ class CbrfCurrencyProvider(CurrencyProvider):
         except Exception as e:  # noqa: BLE001
             self.logger.warning("CBRF rates fetch failed, fallback to fixed: %s", e)
             return FixedCurrencyProvider().get_rates()
+
+
+def get_default_currency_provider() -> CurrencyProvider:
+    """Фабрика провайдера курсов для API/бота, управляется настройками.
+
+    - USE_FIXED_CURRENCY_PROVIDER=true принудительно включает FixedCurrencyProvider (для оффлайна/CI).
+    - Иначе используется CbrfCurrencyProvider со значениями URL/TTL из settings.
+    """
+    if getattr(settings, "USE_FIXED_CURRENCY_PROVIDER", False):
+        return FixedCurrencyProvider()
+    return CbrfCurrencyProvider()
