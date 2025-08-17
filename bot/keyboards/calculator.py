@@ -46,7 +46,7 @@ def vehicle_type_kb() -> InlineKeyboardMarkup:
     for value, label in VehicleType.choices:
         emoji = _VEHICLE_EMOJI.get(str(value), "")
         text = f"{emoji} {label}".strip()
-        builder.button(text=text, callback_data=VehicleTypeCD(type=str(value)).pack())
+        builder.button(text=text, callback_data=VehicleTypeCD.pack(type=str(value)))
     builder.adjust(1)
     return builder.as_markup()
 
@@ -62,6 +62,6 @@ def currency_kb() -> InlineKeyboardMarkup:
         title = _CURRENCY_TITLES_RU.get(code, str(label))
         flag = _CURRENCY_FLAGS.get(code, "")
         text = f"{flag} {title}".strip()
-        builder.button(text=text, callback_data=CurrencyCD(code=code).pack())
+        builder.button(text=text, callback_data=CurrencyCD.pack(code=code))
     builder.adjust(1)
     return builder.as_markup()
