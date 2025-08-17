@@ -298,7 +298,6 @@ async def choose_age_key(call: CallbackQuery, state: FSMContext, callback_data: 
         "price": float(price),
         "currency": str(data.get("currency", "RUB")),
         "engine_cc": int(engine_cc),
-        "hp": int(data.get("hp", 0) or 0),  # hp шага пока нет — используем 0
         "engine_type": str(data.get("engine_type", "")),
         "age_key": str(callback_data.key),
         "is_jur": bool(data.get("is_jur", False)),
