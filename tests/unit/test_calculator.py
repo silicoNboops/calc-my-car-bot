@@ -7,8 +7,12 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from api.calculator.serializers import EstimateRequestSerializer
-from api.calculator.services import CalculatorService, CbrfCurrencyProvider, EstimateInput
-from api.config.currency import get_default_currency_provider
+from api.calculator.services import (
+    CalculatorService,
+    CbrfCurrencyProvider,
+    EstimateInput,
+    get_default_currency_provider,
+)
 from api.calculator.models import DutyRate, Audience, AgeGroup, DutyUnit, CustomsFee
 
 
