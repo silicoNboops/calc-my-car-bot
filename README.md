@@ -16,6 +16,24 @@ ENVIRONMENT=local
 
 И перезапустите контейнеры.
 
+Дополнительно:
+
+- Установка dev-зависимостей происходит только в контейнере `api` (остальные сервисы не требуют dev-зависимостей).
+- Проверить установку можно по логам:
+
+  ```bash
+  docker compose logs api | grep entrypoint
+  ```
+
+- Принудительная переустановка (сброс маркера и рестарт):
+
+  ```bash
+  docker compose exec api rm -f /application/.dev_deps_installed
+  docker compose restart api
+  ```
+
+- Файл-маркер `.dev_deps_installed` добавлен в `.gitignore` и в репозиторий не попадёт.
+
 ### Локали Postgres
 
 В `docker-compose.yaml` для сервиса `db` уже заданы корректные локали/колляции:
