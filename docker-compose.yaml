@@ -2,6 +2,7 @@ services:
   api:
     build: .
     environment:
+      ENVIRONMENT: ${ENVIRONMENT:-production}
       WORKERS: ${WORKERS:-2}
       THREADS: ${THREADS:-2}
     command: make run.server.prod
