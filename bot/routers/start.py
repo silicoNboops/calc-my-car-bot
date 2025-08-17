@@ -18,9 +18,12 @@ router = Router()
 
 
 @router.message(Command(commands=["start"]))
-async def handle_start_command(message: Message) -> None:
+async def handle_start_command(message: Message, state: FSMContext) -> None:
     if message.from_user is None:
         return
+
+    # Сброс состояния визарда при входе в /start
+    await state.clear()
 
     _, is_new = await User.objects.aget_or_create(
         pk=message.from_user.id,
@@ -39,9 +42,12 @@ async def handle_start_command(message: Message) -> None:
 
 
 @router.message(Command(commands=["id"]))
-async def handle_id_command(message: Message) -> None:
+async def handle_id_command(message: Message, state: FSMContext) -> None:
     if message.from_user is None:
         return
+
+    # Сброс состояния визарда при запросе /id
+    await state.clear()
 
     await message.answer(
         f"User Id: <b>{message.from_user.id}</b>\nChat Id: <b>{message.chat.id}</b>",

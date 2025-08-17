@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 from aiogram import Router
 from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
 from asgiref.sync import sync_to_async
 
 from api.calculator.services import (
@@ -93,7 +94,9 @@ def _estimate_sync(payload: dict) -> str:
 
 
 @router.message(Command(commands=["calc"]))
-async def handle_calc_command(message: Message) -> None:
+async def handle_calc_command(message: Message, state: FSMContext) -> None:
+    # Сброс состояния визарда при вызове /calc
+    await state.clear()
     if message.text is None:
         await message.answer(
             "Сообщение пустое. Пример: /calc 20000 EUR 1999 150 Бензин under_3 phys personal"
