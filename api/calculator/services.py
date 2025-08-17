@@ -20,9 +20,11 @@ from api.calculator.models import (
     AgeGroup,
     DutyUnit,
 )
+from api.calculator.choices import EngineType as EngineTypeChoices, VehicleType as VehicleTypeChoices
 
-EngineType = Literal["Бензин", "Дизель", "Электро", "Гибрид(послед)", "Гибрид(паралл)"]
-VehicleType = Literal["car", "quad", "snowmobile", "motorcycle"]
+# Используем Django TextChoices как единый источник истины.
+EngineType = EngineTypeChoices
+VehicleType = VehicleTypeChoices
 AgeKey = Literal["under_3", "3_to_5", "5_to_7", "over_7", "over_5"]
 Currency = Literal["EUR", "USD", "CNY", "JPY", "KRW", "RUB"]
 
@@ -33,8 +35,8 @@ class EstimateInput:
     currency: Currency
     engine_cc: int
     hp: int
-    vehicle_type: VehicleType = "car"
-    engine_type: EngineType = "Бензин"
+    vehicle_type: VehicleType = VehicleTypeChoices.CAR
+    engine_type: EngineType = EngineTypeChoices.BENZIN
     age_key: AgeKey = "under_3"
     is_jur: bool = False
     is_personal_use: Optional[bool] = None
