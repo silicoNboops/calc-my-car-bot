@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any
+
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+if TYPE_CHECKING:  # pragma: no cover - type-only import
+    from rest_framework.request import Request
 
 from api.calculator.serializers import EstimateRequestSerializer, EstimateResponseSerializer
 from api.calculator.services import CalculatorService, EstimateInput, get_default_currency_provider
@@ -15,7 +20,7 @@ class EstimateView(APIView):
     из legacy будет возвращаться рассчитанный ответ.
     """
 
-    def post(self, request, *args, **kwargs):  # type: ignore[override]
+    def post(self, request: "Request", *_args: Any, **_kwargs: Any) -> Response:  # type: ignore[override]
         serializer = EstimateRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
@@ -37,7 +42,7 @@ class EstimateView(APIView):
                     is_personal_use=data.get("is_personal_use"),
                     dvs_hp=data.get("dvs_hp"),
                     electric_hp=data.get("electric_hp"),
-                )
+                ),
             )
         except NotImplementedError:
             return Response({"detail": "Calculation logic not implemented yet"}, status=status.HTTP_501_NOT_IMPLEMENTED)

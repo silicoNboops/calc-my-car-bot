@@ -72,7 +72,8 @@ class Command(BaseCommand):
                     payloads.append(json.load(f))
                 self.stdout.write(f"  - {p.name} [loaded]")
             except Exception as e:  # noqa: BLE001
-                raise CommandError(f"Invalid JSON in {p.name}: {e}")
+                msg = f"Invalid JSON in {p.name}: {e}"
+                raise CommandError(msg) from e
 
         # merge payloads (later files can override earlier ones)
         merged: dict[str, Any] = {
@@ -99,7 +100,7 @@ class Command(BaseCommand):
             "customs": len(merged["customs_fees"]),
         }
         self.stdout.write(
-            f"Summary: duty={summary['duty']}, util={summary['util']}, accise={summary['accise']}, customs={summary['customs']}"
+            f"Summary: duty={summary['duty']}, util={summary['util']}, accise={summary['accise']}, customs={summary['customs']}",
         )
 
         if dry_run:
