@@ -12,6 +12,12 @@ from api.calculator.services import (
     EstimateInput,
     get_default_currency_provider,
 )
+from bot.utils.formatting import fmt_money
+from bot.utils.strings import (
+    CALC_USAGE_HELP,
+    CALC_PARSE_ERROR,
+    CALC_EMPTY_MESSAGE,
+)
 
 if TYPE_CHECKING:
     from aiogram.types import Message
@@ -31,10 +37,7 @@ def _parse_calc_args(text: str) -> dict | str:
     """
     parts = text.strip().split()
     if len(parts) < 7:
-        return (
-            "Неверный формат. Пример: \n"
-            "/calc 20000 EUR 1999 150 Бензин under_3 phys personal"
-        )
+        return CALC_USAGE_HELP
 
     try:
         _, price, currency, engine_cc, hp, engine_type, age_key, *rest = parts
@@ -64,24 +67,21 @@ def _parse_calc_args(text: str) -> dict | str:
             "is_personal_use": is_personal_use,
         }
     except Exception:
-        return (
-            "Не удалось распарсить аргументы. Пример: \n"
-            "/calc 20000 EUR 1999 150 Бензин under_3 phys personal"
-        )
+        return CALC_PARSE_ERROR
 
 
 def _format_result(res) -> str:  # type: ignore[no-untyped-def]
     return (
         "Итог расчёта:\n"
-        f"Цена (RUB): <b>{res.price_rub:,.2f}</b>\n"
-        f"Цена (EUR): <b>{res.price_eur:,.2f}</b>\n"
-        f"Пошлина (EUR): <b>{res.duty_eur:,.2f}</b>\n"
-        f"Пошлина (RUB): <b>{res.duty_rub:,.2f}</b>\n"
-        f"Утильсбор (RUB): <b>{res.util_fee:,.2f}</b>\n"
-        f"Акциз (RUB): <b>{res.accise_rub:,.2f}</b>\n"
-        f"НДС (RUB): <b>{res.vat_rub:,.2f}</b>\n"
-        f"Таможенный сбор (RUB): <b>{res.customs_fee:,.2f}</b>\n"
-        f"Всего (RUB): <b>{res.subtotal_customs:,.2f}</b>\n"
+        f"Цена (RUB): <b>{fmt_money(res.price_rub)}</b>\n"
+        f"Цена (EUR): <b>{fmt_money(res.price_eur)}</b>\n"
+        f"Пошлина (EUR): <b>{fmt_money(res.duty_eur)}</b>\n"
+        f"Пошлина (RUB): <b>{fmt_money(res.duty_rub)}</b>\n"
+        f"Утильсбор (RUB): <b>{fmt_money(res.util_fee)}</b>\n"
+        f"Акциз (RUB): <b>{fmt_money(res.accise_rub)}</b>\n"
+        f"НДС (RUB): <b>{fmt_money(res.vat_rub)}</b>\n"
+        f"Таможенный сбор (RUB): <b>{fmt_money(res.customs_fee)}</b>\n"
+        f"Всего (RUB): <b>{fmt_money(res.subtotal_customs)}</b>\n"
     )
 
 
@@ -98,9 +98,7 @@ async def handle_calc_command(message: Message, state: FSMContext) -> None:
     # Сброс состояния визарда при вызове /calc
     await state.clear()
     if message.text is None:
-        await message.answer(
-            "Сообщение пустое. Пример: /calc 20000 EUR 1999 150 Бензин under_3 phys personal"
-        )
+        await message.answer(CALC_EMPTY_MESSAGE)
         return
 
     parsed = _parse_calc_args(message.text)

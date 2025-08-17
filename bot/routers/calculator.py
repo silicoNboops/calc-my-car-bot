@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import re
 from typing import TYPE_CHECKING
 
 from aiogram import Router, F
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from asgiref.sync import sync_to_async
 
@@ -32,6 +32,22 @@ from bot.keyboards.calculator import (
     format_age_key_title,
 )
 from bot.states import CalculatorState
+from bot.utils.formatting import (
+    format_amount,
+    fmt_money,
+    format_selection_header,
+    parse_int_amount,
+    build_number_error,
+)
+from bot.utils.strings import (
+    PROMPT_CHOOSE_CURRENCY,
+    PROMPT_ENTER_PRICE,
+    PROMPT_CHOOSE_ROLE,
+    PROMPT_CHOOSE_ENGINE_TYPE,
+    PROMPT_ENTER_ENGINE_CC,
+    PROMPT_CHOOSE_AGE,
+    CONTACT_LINE,
+)
 
 if TYPE_CHECKING:
     from aiogram.types import CallbackQuery, Message
@@ -42,15 +58,15 @@ router = Router()
 def _format_calc_result(res) -> str:  # type: ignore[no-untyped-def]
     return (
         "Итог расчёта:\n"
-        f"Цена (RUB): <b>{res.price_rub:,.2f}</b>\n"
-        f"Цена (EUR): <b>{res.price_eur:,.2f}</b>\n"
-        f"Пошлина (EUR): <b>{res.duty_eur:,.2f}</b>\n"
-        f"Пошлина (RUB): <b>{res.duty_rub:,.2f}</b>\n"
-        f"Утильсбор (RUB): <b>{res.util_fee:,.2f}</b>\n"
-        f"Акциз (RUB): <b>{res.accise_rub:,.2f}</b>\n"
-        f"НДС (RUB): <b>{res.vat_rub:,.2f}</b>\n"
-        f"Таможенный сбор (RUB): <b>{res.customs_fee:,.2f}</b>\n"
-        f"Всего (RUB): <b>{res.subtotal_customs:,.2f}</b>\n"
+        f"Цена (RUB): <b>{fmt_money(res.price_rub)}</b>\n"
+        f"Цена (EUR): <b>{fmt_money(res.price_eur)}</b>\n"
+        f"Пошлина (EUR): <b>{fmt_money(res.duty_eur)}</b>\n"
+        f"Пошлина (RUB): <b>{fmt_money(res.duty_rub)}</b>\n"
+        f"Утильсбор (RUB): <b>{fmt_money(res.util_fee)}</b>\n"
+        f"Акциз (RUB): <b>{fmt_money(res.accise_rub)}</b>\n"
+        f"НДС (RUB): <b>{fmt_money(res.vat_rub)}</b>\n"
+        f"Таможенный сбор (RUB): <b>{fmt_money(res.customs_fee)}</b>\n"
+        f"Всего (RUB): <b>{fmt_money(res.subtotal_customs)}</b>\n"
     )
 
 
@@ -77,6 +93,38 @@ def _estimate_sync(payload: dict) -> tuple[str, dict[str, float]]:
     return _format_calc_result(res), provider.get_rates()
 
 
+async def _edit_or_send(
+        message=None,
+        text: str | None = None,
+        reply_markup=None,
+        *,
+        bot=None,
+        chat_id: int | None = None,
+        message_id: int | None = None,
+):
+    """Единый helper: редактирует существующее сообщение или отправляет новое.
+
+    Поддерживает два режима:
+    - message: aiogram Message — будет вызван edit_text, fallback answer.
+    - bot+chat_id+message_id: используем bot.edit_message_text, fallback bot.send_message.
+
+    Возвращает объект Message, который в итоге отображён пользователю.
+    """
+    if message is not None:
+        try:
+            return await message.edit_text(text, reply_markup=reply_markup)
+        except TelegramBadRequest:
+            return await message.answer(text, reply_markup=reply_markup)
+    if bot is not None and chat_id is not None and message_id is not None:
+        try:
+            return await bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=text,
+                                               reply_markup=reply_markup)
+        except TelegramBadRequest:
+            return await bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup)
+    # В крайнем случае — ничего не делаем
+    return None
+
+
 @router.callback_query(CalculatorState.VEHICLE_TYPE, VehicleTypeCD.filter())
 async def choose_vehicle_type(call: CallbackQuery, state: FSMContext, callback_data: VehicleTypeCD) -> None:
     # 1) Сохраняем выбранный тип ТС
@@ -84,14 +132,10 @@ async def choose_vehicle_type(call: CallbackQuery, state: FSMContext, callback_d
     # 2) Переходим к следующему шагу — выбор валюты
     await state.set_state(CalculatorState.CURRENCY)
     # 3) Редактируем текущее сообщение (не создаём новое), показываем клавиатуру валют
-    veh_label = format_vehicle_title(callback_data.type)
-    await call.message.edit_text(
-        (
-            "— Тип авто: <b>{veh}</b>\n\n"
-            "Выберите, в какой валюте будет указана цена автомобиля:"
-        ).format(veh=veh_label),
-        reply_markup=currency_kb(),
-    )
+    # Показываем заголовок с выбранным типом и просим выбрать валюту
+    cur_data = {"vehicle_type": callback_data.type}
+    header = format_selection_header(cur_data)
+    await _edit_or_send(call.message, header + PROMPT_CHOOSE_CURRENCY, reply_markup=currency_kb())
     await call.answer()
 
 
@@ -100,52 +144,15 @@ async def choose_currency(call: CallbackQuery, state: FSMContext, callback_data:
     # Сохраняем валюту и подтверждаем выбор
     await state.update_data(currency=callback_data.code)
     data = await state.get_data()
-    vehicle_type = format_vehicle_title(str(data.get("vehicle_type", "")))
     currency_label = format_currency_title(callback_data.code)
-    msg = await call.message.edit_text(
-        (
-            "Выбор сделан:\n"
-            f"— Тип авто: <b>{vehicle_type}</b>\n"
-            f"— Валюта: <b>{currency_label}</b>\n\n"
-            "Введите стоимость автомобиля (например, 💰 1 200 000):"
-        ),
-        reply_markup=None,
-    )
+    await state.update_data(currency_title=currency_label)
+    # Заголовок с авто и валютой, затем просьба ввести цену
+    header = format_selection_header({**data, "currency": callback_data.code, "currency_title": currency_label})
+    msg = await _edit_or_send(call.message, header + PROMPT_ENTER_PRICE, reply_markup=None)
     # Переходим к вводу стоимости и запоминаем id сообщения с промптом
-    await state.update_data(prompt_chat_id=msg.chat.id, prompt_message_id=msg.message_id, vehicle_title=vehicle_type,
-                            currency_title=currency_label)
+    await state.update_data(prompt_chat_id=msg.chat.id, prompt_message_id=msg.message_id, currency_title=currency_label)
     await state.set_state(CalculatorState.PRICE)
     await call.answer()
-
-
-def _parse_price(raw: str) -> int | None:
-    """Парсит цену из строки, допускает любые пробелы, запятые и точки как разделители тысяч.
-
-    Возвращает целое число (единицы валюты) или None, если невалидно.
-    Ограничения: не пусто, неотрицательно, только цифры после очистки.
-    """
-    if raw is None:
-        return None
-    s = raw.strip()
-    if not s:
-        return None
-    # Удаляем все пробелы (в т.ч. множественные), запятые и точки
-    s = re.sub(r"[\s,\.]+", "", s)
-    if not s or not s.isdigit():
-        return None
-    try:
-        value = int(s)
-    except ValueError:
-        return None
-    # Требование: строго > 0
-    if value <= 0:
-        return None
-    return value
-
-
-def _format_amount(value: int) -> str:
-    """Форматирует число с пробелами в качестве разделителей тысяч."""
-    return f"{value:,}".replace(",", " ")
 
 
 @router.message(CalculatorState.PRICE, F.text)
@@ -156,7 +163,7 @@ async def input_price(message: Message, state: FSMContext) -> None:
     vehicle_title = data.get("vehicle_title")
     currency_title = data.get("currency_title")
 
-    value = _parse_price(message.text or "")
+    value = parse_int_amount(message.text)
     # Пытаемся удалить пользовательское сообщение (эстетика чата)
     try:
         await message.delete()
@@ -164,45 +171,25 @@ async def input_price(message: Message, state: FSMContext) -> None:
         pass
     if value is None:
         # Определяем пояснение ошибки
-        raw = (message.text or "").strip()
-        if not raw:
-            reason = "Ошибка: значение пустое."
-        else:
-            # Если после очистки не цифры — это не число; либо число <= 0
-            cleaned = re.sub(r"[\s,\.]+", "", raw)
-            if not cleaned.isdigit():
-                reason = "Ошибка: введите целое число, можно с пробелами/запятыми/точками как разделителями тысяч."
-            else:
-                reason = "Ошибка: стоимость должна быть > 0."
-
-        error_summary = (
-            "Выбор сделан:\n"
-            f"— Тип авто: <b>{vehicle_title}</b>\n"
-            f"— Валюта: <b>{currency_title}</b>\n"
-            f"— Стоимость: <b>💰 ОШИБКА</b>\n\n"
-            f"{reason}"
-        )
+        raw = message.text or ""
+        reason = build_number_error(raw, what="стоимость")
+        header = format_selection_header(data)
+        error_summary = header + f"<b>— Стоимость: ❌ ОШИБКА</b>\n{reason}"
         if chat_id and msg_id:
-            await message.bot.edit_message_text(chat_id=chat_id, message_id=msg_id, text=error_summary)
+            await _edit_or_send(None, error_summary, bot=message.bot, chat_id=chat_id, message_id=msg_id)
         else:
-            await message.answer(error_summary)
+            await _edit_or_send(message, error_summary)
         return
 
     # Валидно — сохраняем
     await state.update_data(price=value)
-    amount_fmt = _format_amount(value)
-    prompt_text = (
-        "Выбор сделан:\n"
-        f"— Тип авто: <b>{vehicle_title}</b>\n"
-        f"— Валюта: <b>{currency_title}</b>\n"
-        f"— Стоимость: <b>💰 {amount_fmt}</b>\n\n"
-        "Кто ввозит автомобиль:"
-    )
+    header = format_selection_header({**data, "price": value})
+    prompt_text = header + PROMPT_CHOOSE_ROLE
     if chat_id and msg_id:
-        await message.bot.edit_message_text(chat_id=chat_id, message_id=msg_id, text=prompt_text,
-                                            reply_markup=role_kb())
+        await _edit_or_send(None, prompt_text, reply_markup=role_kb(), bot=message.bot, chat_id=chat_id,
+                            message_id=msg_id)
     else:
-        await message.answer(prompt_text, reply_markup=role_kb())
+        await _edit_or_send(message, prompt_text, reply_markup=role_kb())
     await state.set_state(CalculatorState.ROLE)
 
 
@@ -226,20 +213,8 @@ async def choose_role(call: CallbackQuery, state: FSMContext, callback_data: Rol
         is_personal_use=is_personal_use,
     )
     data = await state.get_data()
-    vehicle_title = data.get("vehicle_title") or format_vehicle_title(str(data.get("vehicle_type", "")))
-    currency_title = data.get("currency_title") or format_currency_title(str(data.get("currency", "")))
-    price = int(data.get("price", 0))
-    amount_fmt = _format_amount(price)
-    importer_title = format_importer_kind_title(kind)
-    prompt_text = (
-        "Выбор сделан:\n"
-        f"— Тип авто: <b>{vehicle_title}</b>\n"
-        f"— Валюта: <b>{currency_title}</b>\n"
-        f"— Стоимость: <b>💰 {amount_fmt}</b>\n"
-        f"— Кто ввозит: <b>{importer_title}</b>\n\n"
-        "Выберите тип двигателя:"
-    )
-    await call.message.edit_text(prompt_text, reply_markup=engine_type_kb())
+    prompt_text = format_selection_header(data) + PROMPT_CHOOSE_ENGINE_TYPE
+    await _edit_or_send(call.message, prompt_text, reply_markup=engine_type_kb())
     await call.answer()
     await state.set_state(CalculatorState.ENGINE_TYPE)
 
@@ -248,23 +223,10 @@ async def choose_role(call: CallbackQuery, state: FSMContext, callback_data: Rol
 async def choose_engine_type(call: CallbackQuery, state: FSMContext, callback_data: EngineTypeCD) -> None:
     await state.update_data(engine_type=callback_data.kind)
     data = await state.get_data()
-    vehicle_title = data.get("vehicle_title") or format_vehicle_title(str(data.get("vehicle_type", "")))
-    currency_title = data.get("currency_title") or format_currency_title(str(data.get("currency", "")))
-    price = int(data.get("price", 0))
-    amount_fmt = _format_amount(price)
-    importer_title = format_importer_kind_title(str(data.get("importer_kind", "")))
-    engine_title = format_engine_type_title(callback_data.kind)
     # Запрос объёма двигателя
-    prompt_text = (
-        "Выбор сделан:\n"
-        f"— Тип авто: <b>{vehicle_title}</b>\n"
-        f"— Валюта: <b>{currency_title}</b>\n"
-        f"— Стоимость: <b>💰 {amount_fmt}</b>\n"
-        f"— Кто ввозит: <b>{importer_title}</b>\n"
-        f"— Тип двигателя: <b>{engine_title}</b>\n\n"
-        "Введите объём двигателя в см³ (например, 1500):"
-    )
-    msg = await call.message.edit_text(prompt_text)
+    header = format_selection_header(data)
+    prompt_text = header + PROMPT_ENTER_ENGINE_CC
+    msg = await _edit_or_send(call.message, prompt_text)
     await state.update_data(prompt_chat_id=msg.chat.id, prompt_message_id=msg.message_id)
     await call.answer()
     await state.set_state(CalculatorState.ENGINE_CC)
@@ -287,68 +249,34 @@ async def input_engine_cc(message: Message, state: FSMContext) -> None:
     except Exception:
         pass
 
-    s = re.sub(r"[\s,\.]+", "", raw)
-    value: int | None
-    if not raw:
-        value = None
-    elif s.isdigit():
-        value = int(s)
-        if value <= 0:
-            value = None
-    else:
-        value = None
+    value = parse_int_amount(raw)
 
-    amount_fmt = _format_amount(int(data.get("price", 0)))
+    amount_fmt = format_amount(int(data.get("price", 0)))
 
     if value is None:
         # Подробное сообщение об ошибке
-        if not raw:
-            reason = "Ошибка: значение пустое."
-        else:
-            if not s.isdigit():
-                reason = "Ошибка: введите целое число, можно с пробелами/запятыми/точками как разделителями тысяч."
-            else:
-                reason = "Ошибка: объём двигателя должен быть > 0."
-
-        error_summary = (
-            "Выбор сделан:\n"
-            f"— Тип авто: <b>{vehicle_title}</b>\n"
-            f"— Валюта: <b>{currency_title}</b>\n"
-            f"— Стоимость: <b>💰 {_format_amount(int(data.get('price', 0)))}</b>\n"
-            f"— Кто ввозит: <b>{importer_title}</b>\n"
-            f"— Тип двигателя: <b>{engine_title}</b>\n\n"
-            f"<b>— Объём: ❌ ОШИБКА</b>\n{reason}\n\n"
-            "Введите объём двигателя в см³ (например, 1500):"
-        )
+        reason = build_number_error(raw, what="объём двигателя")
+        header = format_selection_header(data)
+        error_summary = header + f"<b>— Объём: ❌ ОШИБКА</b>\n{reason}\n\n{PROMPT_ENTER_ENGINE_CC}"
         if chat_id and msg_id:
-            await message.bot.edit_message_text(chat_id=chat_id, message_id=msg_id, text=error_summary)
+            await _edit_or_send(None, error_summary, bot=message.bot, chat_id=chat_id, message_id=msg_id)
         else:
-            await message.answer(error_summary)
+            await _edit_or_send(message, error_summary)
         return
 
     # Валидно: сохраняем и показываем резюме
     await state.update_data(engine_cc=value)
-    engine_cc_fmt = f"{_format_amount(value)} см³"
-    summary_text = (
-        "Выбор сделан:\n"
-        f"— Тип авто: <b>{vehicle_title}</b>\n"
-        f"— Валюта: <b>{currency_title}</b>\n"
-        f"— Стоимость: <b>💰 {amount_fmt}</b>\n"
-        f"— Кто ввозит: <b>{importer_title}</b>\n"
-        f"— Тип двигателя: <b>{engine_title}</b>\n"
-        f"— Объём: <b>🧱 {engine_cc_fmt}</b>\n\n"
-        "Следующий шаг мастера добавлю далее."
-    )
+    engine_cc_fmt = f"{format_amount(value)} см³"
     if chat_id and msg_id:
         # После ввода объёма предлагаем выбрать возраст авто
-        prompt_text = (
-                summary_text + "\nВыберите возраст автомобиля:"
-        )
-        await message.bot.edit_message_text(chat_id=chat_id, message_id=msg_id, text=prompt_text,
-                                            reply_markup=age_key_kb())
+        header2 = format_selection_header({**data, "engine_cc": value})
+        prompt_text = header2 + PROMPT_CHOOSE_AGE
+        await _edit_or_send(None, prompt_text, reply_markup=age_key_kb(), bot=message.bot, chat_id=chat_id,
+                            message_id=msg_id)
     else:
-        await message.answer(summary_text)
-        await message.answer("Выберите возраст автомобиля:", reply_markup=age_key_kb())
+        header2 = format_selection_header({**data, "engine_cc": value})
+        await _edit_or_send(message, header2)
+        await _edit_or_send(message, PROMPT_CHOOSE_AGE, reply_markup=age_key_kb())
     await state.set_state(CalculatorState.AGE_KEY)
 
 
@@ -359,18 +287,34 @@ async def choose_age_key(call: CallbackQuery, state: FSMContext, callback_data: 
     vehicle_title = data.get("vehicle_title") or format_vehicle_title(str(data.get("vehicle_type", "")))
     currency_title = data.get("currency_title") or format_currency_title(str(data.get("currency", "")))
     price = int(data.get("price", 0))
-    amount_fmt = _format_amount(price)
+    amount_fmt = format_amount(price)
     importer_title = format_importer_kind_title(str(data.get("importer_kind", "")))
     engine_title = format_engine_type_title(str(data.get("engine_type", "")))
     engine_cc = int(data.get("engine_cc", 0))
-    engine_cc_fmt = f"{_format_amount(engine_cc)} см³" if engine_cc else "—"
+    engine_cc_fmt = f"{format_amount(engine_cc)} см³" if engine_cc else "—"
     age_title = format_age_key_title(callback_data.key)
     # Пакуем пейлоад как для /calc
+    """
+В 
+services.py
+акциз считается на основе hp только для коммерческого использования/юрлиц:
+см. 
+_calc_accise(self, hp, is_commercial, engine_type, ...)
+.
+Для ФЛ (personal) акциз = 0, и hp не влияет на результат. Поэтому hp=0 безопасен для большинства персональных сценариев.
+Для коммерческих сценариев без запроса мощности результат по акцизу может отличаться от реального. Правильнее будет добавить шаг ввода мощности в визард.
+Предложение на будущее (без внедрения сейчас)
+Добавить шаг ввода мощности:
+Показывать шаг только если is_jur == True или is_personal_use == False.
+Для гибридов/электро — обсудить ввод dvs_hp/electric_hp или упрощённую стратегию.
+Пока временно оставляем hp=0 как разумный дефолт.
+"""
     payload = {
         "price": float(price),
         "currency": str(data.get("currency", "RUB")),
         "engine_cc": int(engine_cc),
-        "hp": int(data.get("hp", 0) or 0),  # hp шага пока нет — используем 0
+        # TODO потом будем задавать шагом от юзера
+        "hp": 0,
         "engine_type": str(data.get("engine_type", "")),
         "age_key": str(callback_data.key),
         "is_jur": bool(data.get("is_jur", False)),
@@ -395,21 +339,22 @@ async def choose_age_key(call: CallbackQuery, state: FSMContext, callback_data: 
     except Exception:
         fx_line = ""
 
-    header = (
-        "Выбор сделан:\n"
-        f"— Тип авто: <b>{vehicle_title}</b>\n"
-        f"— Валюта: <b>{currency_title}</b>\n"
-        f"— Стоимость: <b>💰 {amount_fmt}</b>\n"
-        f"— Кто ввозит: <b>{importer_title}</b>\n"
-        f"— Тип двигателя: <b>{engine_title}</b>\n"
-        f"— Объём: <b>🧱 {engine_cc_fmt}</b>\n"
-        f"— Возраст: <b>{age_title}</b>\n\n"
+    header = format_selection_header(
+        {
+            "vehicle_title": vehicle_title,
+            "vehicle_type": data.get("vehicle_type"),
+            "currency_title": currency_title,
+            "currency": data.get("currency"),
+            "price": price,
+            "importer_kind": data.get("importer_kind"),
+            "engine_type": data.get("engine_type"),
+            "engine_cc": engine_cc,
+        },
+        age_title=age_title,
     )
 
-    contact = "\nСвяжитесь с нами: @Slaford - Слафординка"
-
-    final_text = header + result_text + fx_line + contact
-    await call.message.edit_text(final_text, reply_markup=None)
+    final_text = header + result_text + fx_line + CONTACT_LINE
+    await _edit_or_send(call.message, final_text, reply_markup=None)
     await call.answer()
     # Сбрасываем состояние и данные визарда
     await state.clear()
