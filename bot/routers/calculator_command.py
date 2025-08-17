@@ -13,6 +13,11 @@ from api.calculator.services import (
     get_default_currency_provider,
 )
 from bot.utils.formatting import fmt_money
+from bot.utils.strings import (
+    CALC_USAGE_HELP,
+    CALC_PARSE_ERROR,
+    CALC_EMPTY_MESSAGE,
+)
 
 if TYPE_CHECKING:
     from aiogram.types import Message
@@ -32,10 +37,7 @@ def _parse_calc_args(text: str) -> dict | str:
     """
     parts = text.strip().split()
     if len(parts) < 7:
-        return (
-            "Неверный формат. Пример: \n"
-            "/calc 20000 EUR 1999 150 Бензин under_3 phys personal"
-        )
+        return CALC_USAGE_HELP
 
     try:
         _, price, currency, engine_cc, hp, engine_type, age_key, *rest = parts
@@ -65,10 +67,7 @@ def _parse_calc_args(text: str) -> dict | str:
             "is_personal_use": is_personal_use,
         }
     except Exception:
-        return (
-            "Не удалось распарсить аргументы. Пример: \n"
-            "/calc 20000 EUR 1999 150 Бензин under_3 phys personal"
-        )
+        return CALC_PARSE_ERROR
 
 
 def _format_result(res) -> str:  # type: ignore[no-untyped-def]
@@ -102,9 +101,7 @@ async def handle_calc_command(message: Message, state: FSMContext) -> None:
     # Сброс состояния визарда при вызове /calc
     await state.clear()
     if message.text is None:
-        await message.answer(
-            "Сообщение пустое. Пример: /calc 20000 EUR 1999 150 Бензин under_3 phys personal"
-        )
+        await message.answer(CALC_EMPTY_MESSAGE)
         return
 
     parsed = _parse_calc_args(message.text)
