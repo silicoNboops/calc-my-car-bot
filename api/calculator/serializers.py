@@ -9,7 +9,7 @@ class EstimateRequestSerializer(serializers.Serializer):
     engine_cc = serializers.IntegerField(min_value=1)
     hp = serializers.IntegerField(min_value=1)
     vehicle_type = serializers.ChoiceField(
-        choices=["car", "quad", "snowmobile", "motorcycle"], default="car"
+        choices=["car", "quad", "snowmobile", "motorcycle"], default="car",
     )
     engine_type = serializers.ChoiceField(
         choices=[
@@ -42,12 +42,11 @@ class EstimateRequestSerializer(serializers.Serializer):
             # For legal entities we do not accept 'over_5' (legacy splits into 5-7 and over_7)
             if age_key == "over_5":
                 raise serializers.ValidationError({
-                    "age_key": "Для юрлиц используйте '5_to_7' или 'over_7' вместо 'over_5'."
+                    "age_key": "Для юрлиц используйте '5_to_7' или 'over_7' вместо 'over_5'.",
                 })
-        else:
+        elif age_key in {"5_to_7", "over_7"}:
             # For physical persons normalize jur-only tails to 'over_5'
-            if age_key in {"5_to_7", "over_7"}:
-                attrs["age_key"] = "over_5"
+            attrs["age_key"] = "over_5"
 
         # Валидация для гибридов
         if engine_type in {"Гибрид(послед)", "Гибрид(паралл)"}:
@@ -60,7 +59,7 @@ class EstimateRequestSerializer(serializers.Serializer):
         # Ограничения по типу ТС: для не-"car" запрещаем EV/гибриды
         if vehicle_type != "car" and engine_type in {"Электро", "Гибрид(послед)", "Гибрид(паралл)"}:
             raise serializers.ValidationError({
-                "engine_type": "Для выбранного типа ТС поддерживаются только ДВС (Бензин/Дизель)."
+                "engine_type": "Для выбранного типа ТС поддерживаются только ДВС (Бензин/Дизель).",
             })
 
         return attrs

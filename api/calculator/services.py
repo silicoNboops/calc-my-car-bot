@@ -73,7 +73,7 @@ class CustomsCalculator:
     Будет реализована после переноса правил из legacy-калькулятора.
     """
 
-    def __init__(self, rates: dict[str, QuerySet], settings: Settings, currency_rates: dict[str, float]):
+    def __init__(self, rates: dict[str, QuerySet], settings: Settings, currency_rates: dict[str, float]) -> None:
         self.duty_rates: QuerySet[DutyRate] = rates["duty"]
         self.util_fees: QuerySet[UtilFee] = rates["util"]
         self.accise_rates: QuerySet[AcciseRate] = rates["accise"]
@@ -199,7 +199,7 @@ class CustomsCalculator:
             row = self._find_bracket(engine_cc, table, "max_cc")
             return util_base * float(row.get("coeff", 0.0))
 
-    def _calc_accise(self, hp: int, is_commercial: bool, engine_type: EngineType, dvs_hp: Optional[int] = None, electric_hp: Optional[int] = None) -> float:
+    def _calc_accise(self, hp: int, is_commercial: bool, engine_type: EngineType, dvs_hp: int | None = None, electric_hp: int | None = None) -> float:
         if not is_commercial:
             return 0.0
         # Определяем мощность для расчёта по v2
@@ -237,7 +237,8 @@ class CustomsCalculator:
         # Конвертация валют (как в legacy): fx — RUB за единицу валюты
         fx = self.currency_rates
         if data.currency not in fx:
-            raise ValueError(f"Unsupported currency: {data.currency}")
+            msg = f"Unsupported currency: {data.currency}"
+            raise ValueError(msg)
         price_rub = float(data.price) * float(fx[data.currency])
         price_eur = price_rub / float(fx.get("EUR", 1.0))
 
@@ -318,7 +319,7 @@ class CustomsCalculator:
 class CalculatorService:
     """Фасад: достаёт ORM-данные и курсы валют, конфигурирует калькулятор."""
 
-    def __init__(self, currency_provider: CurrencyProvider):
+    def __init__(self, currency_provider: CurrencyProvider) -> None:
         self.currency_provider = currency_provider
 
     def build_calculator(self) -> CustomsCalculator:
@@ -330,17 +331,13 @@ class CalculatorService:
             "accise": AcciseRate.objects.all(),
             "customs_fee": CustomsFee.objects.all(),
         }
-        calculator = CustomsCalculator(rates, settings, currency_rates)
-        return calculator
+        return CustomsCalculator(rates, settings, currency_rates)
 
 
 class FixedCurrencyProvider(CurrencyProvider):
-    """Временный провайдер курсов валют: фиксированные значения.
+    """Static currency provider for offline/CI.
 
-{{ ... }}
-    (RUB=1.0, EUR≈100 и т.д.).
-
-    TODO: заменить на реальный провайдер курсов (ЦБ РФ) с кэшированием.
+    Default sample rates: RUB=1.0, EUR≈100, USD≈95, etc.
     """
 
     def __init__(self, rates: dict[str, float] | None = None) -> None:
@@ -371,7 +368,7 @@ class CbrfCurrencyProvider(CurrencyProvider):
     _MEM_CACHE_KEY = "currency_rates_cbrf_v1"
     _mem_cache: dict[str, float] | None = None
 
-    def __init__(self, cache_timeout_seconds: Optional[int] = None, url: Optional[str] = None) -> None:
+    def __init__(self, cache_timeout_seconds: int | None = None, url: str | None = None) -> None:
         # Настройки по умолчанию берём из Django settings, но можно переопределить аргументами
         default_ttl = getattr(settings, "CBR_CACHE_TTL", 3600)
         default_url = getattr(settings, "CBR_URL", self.CBR_URL)
@@ -412,35 +409,36 @@ class CbrfCurrencyProvider(CurrencyProvider):
                 rates[code] = value / nominal
 
             if "EUR" not in rates:
-                raise ValueError("EUR rate is missing from CBR response")
+                msg = "EUR rate is missing from CBR response"
+                raise ValueError(msg)
 
             # 3) Пишем в кэш — ошибки игнорируем
             try:
                 cache.set(cache_key, rates, timeout=self.cache_timeout)
             except Exception as e:  # noqa: BLE001
                 self.logger.warning("CBRF rates cache set failed, continue: %s", e)
-                # Пишем в процессный кэш на случай отсутствия Redis
-                self.__class__._mem_cache = dict(rates)
-
-            return rates
+            # Всегда обновляем процессный кэш на случай отсутствия Redis
+            self.__class__._mem_cache = dict(rates)
         except Exception as e:  # noqa: BLE001
             self.logger.warning("CBRF rates fetch failed, fallback to fixed: %s", e)
             return FixedCurrencyProvider().get_rates()
+        else:
+            return rates
 
 
 def get_default_currency_provider() -> CurrencyProvider:
-    """Фабрика провайдера курсов для API/бота, управляется настройками.
+    """Select default currency provider for API/bot.
 
-    - USE_FIXED_CURRENCY_PROVIDER=true принудительно включает FixedCurrencyProvider (для оффлайна/CI).
-    - Иначе используется CbrfCurrencyProvider со значениями URL/TTL из settings.
+    - USE_FIXED_CURRENCY_PROVIDER=true forces FixedCurrencyProvider (offline/CI).
+    - Otherwise CbrfCurrencyProvider is used with URL/TTL from Django settings.
     """
-    # Приоритет: явное значение в Django settings имеет преимущество над окружением.
-    if hasattr(settings, "USE_FIXED_CURRENCY_PROVIDER"):
-        if bool(getattr(settings, "USE_FIXED_CURRENCY_PROVIDER")):
+    # 1) Explicit Django settings take precedence over env.
+    try:
+        if bool(settings.USE_FIXED_CURRENCY_PROVIDER):  # type: ignore[attr-defined]
             return FixedCurrencyProvider()
         return CbrfCurrencyProvider()
-
-    # Если в settings не задано — читаем из окружения (для CI/локала)
-    env_flag = os.environ.get("USE_FIXED_CURRENCY_PROVIDER", "").strip().lower()
-    env_enabled = env_flag in {"1", "true", "yes", "on"}
-    return FixedCurrencyProvider() if env_enabled else CbrfCurrencyProvider()
+    except AttributeError:
+        # 2) Fallback to env (for CI/local)
+        env_flag = os.environ.get("USE_FIXED_CURRENCY_PROVIDER", "").strip().lower()
+        env_enabled = env_flag in {"1", "true", "yes", "on"}
+        return FixedCurrencyProvider() if env_enabled else CbrfCurrencyProvider()
