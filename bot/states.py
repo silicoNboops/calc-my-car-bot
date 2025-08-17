@@ -12,6 +12,7 @@ class CalculatorState(StatesGroup):
     VEHICLE_TYPE = State()
     CURRENCY = State()
     PRICE = State()
+    ROLE = State()
     # TODO: ENGINE_CC = State()
     # TODO: HP = State()
     # TODO: ENGINE_TYPE = State()

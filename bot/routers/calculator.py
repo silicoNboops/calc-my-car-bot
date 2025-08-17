@@ -12,6 +12,9 @@ from bot.keyboards.calculator import (
     currency_kb,
     format_vehicle_title,
     format_currency_title,
+    RoleCD,
+    role_kb,
+    format_role_title,
 )
 from bot.states import CalculatorState
 
@@ -135,15 +138,38 @@ async def input_price(message: Message, state: FSMContext) -> None:
     # Валидно — сохраняем
     await state.update_data(price=value)
     amount_fmt = _format_amount(value)
-    summary_text = (
+    prompt_text = (
         "Выбор сделан:\n"
         f"— Тип авто: <b>{vehicle_title}</b>\n"
         f"— Валюта: <b>{currency_title}</b>\n"
         f"— Стоимость: <b>💰 {amount_fmt}</b>\n\n"
-        "Следующий шаг мастера добавлю далее."
+        "Кто ввозит автомобиль:"
     )
     if chat_id and msg_id:
-        await message.bot.edit_message_text(chat_id=chat_id, message_id=msg_id, text=summary_text)
+        await message.bot.edit_message_text(chat_id=chat_id, message_id=msg_id, text=prompt_text, reply_markup=role_kb())
     else:
-        await message.answer(summary_text)
-    # Здесь далее можно перевести в следующий стейт
+        await message.answer(prompt_text, reply_markup=role_kb())
+    await state.set_state(CalculatorState.ROLE)
+
+
+@router.callback_query(CalculatorState.ROLE, RoleCD.filter())
+async def choose_role(call: CallbackQuery, state: FSMContext, callback_data: RoleCD) -> None:
+    await state.update_data(role=callback_data.kind)
+    data = await state.get_data()
+    vehicle_title = data.get("vehicle_title") or format_vehicle_title(str(data.get("vehicle_type", "")))
+    currency_title = data.get("currency_title") or format_currency_title(str(data.get("currency", "")))
+    price = int(data.get("price", 0))
+    amount_fmt = _format_amount(price)
+    role_title = format_role_title(callback_data.kind)
+    await call.message.edit_text(
+        (
+            "Выбор сделан:\n"
+            f"— Тип авто: <b>{vehicle_title}</b>\n"
+            f"— Валюта: <b>{currency_title}</b>\n"
+            f"— Стоимость: <b>💰 {amount_fmt}</b>\n"
+            f"— Кто ввозит: <b>{role_title}</b>\n\n"
+            "Следующий шаг мастера добавлю далее."
+        ),
+        reply_markup=None,
+    )
+    await call.answer()

@@ -78,3 +78,36 @@ def format_currency_title(code: str) -> str:
     title = _CURRENCY_TITLES_RU.get(code, dict(Currency.choices).get(code, code))
     flag = _CURRENCY_FLAGS.get(code, "")
     return f"{flag} {title}".strip()
+
+
+# ROLE (кто ввозит): физ/юр
+class RoleCD(CallbackData, prefix="role"):
+    kind: str  # phys | jur
+
+
+_ROLE_TITLES: dict[str, str] = {
+    "phys": "Физическое лицо",
+    "jur": "Юридическое лицо",
+}
+
+_ROLE_EMOJI: dict[str, str] = {
+    "phys": "👤",
+    "jur": "🏢",
+}
+
+
+def role_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    for kind in ("phys", "jur"):
+        title = _ROLE_TITLES[kind]
+        emoji = _ROLE_EMOJI.get(kind, "")
+        text = f"{emoji} {title}".strip()
+        builder.button(text=text, callback_data=RoleCD(kind=kind).pack())
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def format_role_title(kind: str) -> str:
+    title = _ROLE_TITLES.get(kind, kind)
+    emoji = _ROLE_EMOJI.get(kind, "")
+    return f"{emoji} {title}".strip()
