@@ -44,6 +44,7 @@ urlpatterns = [
     *_swagger_urlpatterns,
     path("", lambda _request: redirect("docs/"), name="home"),
     path("admin/", admin.site.urls),
+    path("api/v1/calc/", include("api.calculator.urls")),
     path("", include("api.user.urls")),
 ]
 
