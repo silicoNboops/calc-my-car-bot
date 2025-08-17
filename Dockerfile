@@ -16,4 +16,3 @@ RUN if [ "$INSTALL_DEV_ENV" = "local" ] && [ -f requirements-dev.txt ]; then \
     fi
 
 COPY . .
-
