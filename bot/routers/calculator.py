@@ -7,7 +7,14 @@ from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
 from asgiref.sync import sync_to_async
 
+from api.calculator.choices import Currency as CurrencyChoices, EngineType as EngineTypeChoices, \
+    VehicleType as VehicleTypeChoices, AgeKey as AgeKeyChoices
 from api.calculator.choices import ImporterKind
+from api.calculator.services import (
+    CalculatorService,
+    EstimateInput,
+    get_default_currency_provider,
+)
 from bot.keyboards.calculator import (
     VehicleTypeCD,
     CurrencyCD,
@@ -24,12 +31,6 @@ from bot.keyboards.calculator import (
     age_key_kb,
     format_age_key_title,
 )
-from api.calculator.services import (
-    CalculatorService,
-    EstimateInput,
-    get_default_currency_provider,
-)
-from api.calculator.choices import Currency as CurrencyChoices, EngineType as EngineTypeChoices, VehicleType as VehicleTypeChoices, AgeKey as AgeKeyChoices
 from bot.states import CalculatorState
 
 if TYPE_CHECKING:
@@ -74,6 +75,7 @@ def _estimate_sync(payload: dict) -> tuple[str, dict[str, float]]:
         pass
     res = calc.estimate(EstimateInput(**data))
     return _format_calc_result(res), provider.get_rates()
+
 
 @router.callback_query(CalculatorState.VEHICLE_TYPE, VehicleTypeCD.filter())
 async def choose_vehicle_type(call: CallbackQuery, state: FSMContext, callback_data: VehicleTypeCD) -> None:
@@ -340,9 +342,10 @@ async def input_engine_cc(message: Message, state: FSMContext) -> None:
     if chat_id and msg_id:
         # После ввода объёма предлагаем выбрать возраст авто
         prompt_text = (
-            summary_text + "\nВыберите возраст автомобиля:"
+                summary_text + "\nВыберите возраст автомобиля:"
         )
-        await message.bot.edit_message_text(chat_id=chat_id, message_id=msg_id, text=prompt_text, reply_markup=age_key_kb())
+        await message.bot.edit_message_text(chat_id=chat_id, message_id=msg_id, text=prompt_text,
+                                            reply_markup=age_key_kb())
     else:
         await message.answer(summary_text)
         await message.answer("Выберите возраст автомобиля:", reply_markup=age_key_kb())
