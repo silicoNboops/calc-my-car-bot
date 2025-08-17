@@ -20,29 +20,60 @@
 
 ## Примеры запуска
 
-- Быстрый прогон тестов на SQLite (рекомендуется в Docker):
+- Быстрый smoke-прогон на SQLite in-memory (самый быстрый):
 
 ```bash
 # внутри хоста
 docker compose exec \
   -e USE_TEST_DB=1 \
   -e TEST_DATABASE_URL=sqlite:///:memory: \
-  api pytest -q
+  -e USE_FIXED_CURRENCY_PROVIDER=1 \
+  api python -m pytest -q
 ```
 
-- Прогон с использованием БД по умолчанию (`DATABASE_URL`):
+- Полный прогон на Postgres (использует переменную `DATABASE_URL`):
 
 ```bash
-docker compose exec api pytest -q
+docker compose exec \
+  -e DATABASE_URL=postgres://postgres:lolgrec@db:5432/postgres \
+  -e USE_FIXED_CURRENCY_PROVIDER=1 \
+  api python -m pytest -q
 ```
 
-- Запуск с отчётом покрытия и настройками из `pyproject.toml` (по умолчанию уже включены):
+Примечания:
+
+- `USE_FIXED_CURRENCY_PROVIDER=1` принудительно включает фиксированный провайдер валют, чтобы тесты были детерминированными и не зависели от сети/ЦБ РФ. Для проверки реального провайдера уберите флаг, но такие прогоны могут быть нестабильными офлайн.
+- В smoke-режиме SQLite in-memory даёт максимальную скорость. В Postgres-режиме проверяются миграции, последовательности и колляции.
+
+### Примеры без `USE_FIXED_CURRENCY_PROVIDER=1`
+
+- Postgres (реальный провайдер курсов, нужен доступ в интернет):
+
+```bash
+docker compose exec \
+  -e DATABASE_URL=postgres://postgres:lolgrec@db:5432/postgres \
+  api python -m pytest -q
+```
+
+- SQLite in-memory (smoke, реальный провайдер курсов, нужен интернет):
 
 ```bash
 docker compose exec \
   -e USE_TEST_DB=1 \
   -e TEST_DATABASE_URL=sqlite:///:memory: \
-  api pytest --cov --cov-report=html -vv
+  api python -m pytest -q
+```
+
+Замечание: юнит-тесты провайдера (`tests/unit/test_currency_provider.py`) мокают сеть и стабильны в любом режиме; без флага реальные сетевые обращения делает сервис в интеграционных местах (например, при сборке калькулятора).
+
+- Прогон с отчётом покрытия (пример на SQLite in-memory):
+
+```bash
+docker compose exec \
+  -e USE_TEST_DB=1 \
+  -e TEST_DATABASE_URL=sqlite:///:memory: \
+  -e USE_FIXED_CURRENCY_PROVIDER=1 \
+  api python -m pytest --cov --cov-report=html -vv
 ```
 
 ## Фикстуры данных для расчётов
@@ -61,7 +92,7 @@ def _seed_customs_rates(django_db_setup, django_db_blocker):
 
 ## Тесты провайдера курсов ЦБ РФ
 
-Добавлен модуль `tests/unit/test_currency_provider.py` для проверки `CbrfCurrencyProvider`:
+Добавлен модуль `tests/unit/test_currency_provider.py`<!-- Раздел про конфигурацию провайдера перемещён в docs/CURRENCY_PROVIDER.md -->
 
 - Проверяется корректный разбор ответа ЦБ и использование кэша между вызовами (без повторного HTTP-запроса).
 - При отсутствии курса EUR или сетевой ошибке включается безопасный fallback на `FixedCurrencyProvider`.
@@ -80,4 +111,3 @@ docker compose exec \
 
 - Конфигурация pytest: `pyproject.toml` → `[tool.pytest.ini_options]`.
 - Основная настройка БД: `api/config/database.py`.
-- Эндпоинт расчёта: `api/calculator/views.py` (`name="estimate"`, namespace `calculator`).

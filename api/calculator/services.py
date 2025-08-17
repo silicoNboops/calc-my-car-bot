@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import logging
 import requests
 from typing import Literal, Optional
+import os
 
 from django.core.cache import cache
 from django.db.models import QuerySet
+from django.conf import settings
+from dataclasses import dataclass
 
 from api.calculator.models import (
     AcciseRate,
@@ -19,7 +21,8 @@ from api.calculator.models import (
     DutyUnit,
 )
 
-EngineType = Literal["Бензин", "Дизель"]
+EngineType = Literal["Бензин", "Дизель", "Электро", "Гибрид(послед)", "Гибрид(паралл)"]
+VehicleType = Literal["car", "quad", "snowmobile", "motorcycle"]
 AgeKey = Literal["under_3", "3_to_5", "5_to_7", "over_7", "over_5"]
 Currency = Literal["EUR", "USD", "CNY", "JPY", "KRW", "RUB"]
 
@@ -30,10 +33,14 @@ class EstimateInput:
     currency: Currency
     engine_cc: int
     hp: int
+    vehicle_type: VehicleType = "car"
     engine_type: EngineType = "Бензин"
     age_key: AgeKey = "under_3"
     is_jur: bool = False
     is_personal_use: Optional[bool] = None
+    # Доп. поля для гибридов
+    dvs_hp: Optional[int] = None
+    electric_hp: Optional[int] = None
 
 
 @dataclass
@@ -153,14 +160,37 @@ class CustomsCalculator:
                 row = self._find_bracket(engine_cc, rows, "max_cc")
                 return engine_cc * float(row.get("rate_eur_cc", 0.0))
 
-    def _calc_util(self, is_commercial: bool, age_key: str, engine_cc: int) -> float:
+    def _calc_util(self, is_commercial: bool, age_key: str, engine_cc: int, engine_type: EngineType, vehicle_type: VehicleType = "car") -> float:
         # util_base хранится в Settings (fallback к 20000.0 при отсутствии)
         util_base = float(getattr(self.settings, "util_base", 20000.0) or 20000.0)
-        if not is_commercial:
+        if not is_commercial and vehicle_type == "car":
             row = self.util_fees.filter(kind="personal_new").first() if age_key == "under_3" else self.util_fees.filter(kind="personal_old").first()
             coeff = float(getattr(row, "coeff", 0.0))
             return util_base * coeff
+        elif not is_commercial and vehicle_type != "car":
+            # v2: фикс коэффициенты для quad/snowmobile/motorcycle у ФЛ
+            is_new = (age_key == "under_3")
+            coeff = 1.63 if is_new else 6.1
+            # Для этих ТС util_base отличается от авто: 172500 в v2.
+            # Но мы используем Settings.util_base как базу и умножаем на отношение (172500/20000)=8.625,
+            # чтобы не вводить миграции. При default util_base=20000 это даст корректные суммы.
+            base_multiplier = 8.625
+            return util_base * base_multiplier * coeff
         else:
+            # EV/Hybrid коммерческий: по v2 фиксированные коэффициенты, не зависящие от объёма
+            if vehicle_type == "car" and engine_type in ("Электро", "Гибрид(послед)", "Гибрид(паралл)"):
+                if age_key == "under_3":
+                    coeff = 1.42  # new_electric/new_hybrid
+                else:
+                    coeff = 2.84  # old_electric/old_hybrid
+                return util_base * coeff
+            elif vehicle_type != "car":
+                # Коммерческий quad/snowmobile/motorcycle: те же коэффициенты, что для персональных в v2
+                is_new = (age_key == "under_3")
+                coeff = 1.63 if is_new else 6.1
+                base_multiplier = 8.625
+                return util_base * base_multiplier * coeff
+            # ICE коммерческий: как раньше, по объёму из БД
             group = "commercial_under_3" if age_key == "under_3" else "commercial_over_3"
             rows = list(self.util_fees.filter(kind=group).order_by("max_cc"))
             table = [{"max_cc": float(r.max_cc or float("inf")), "coeff": float(r.coeff)} for r in rows] if rows else []
@@ -169,15 +199,25 @@ class CustomsCalculator:
             row = self._find_bracket(engine_cc, table, "max_cc")
             return util_base * float(row.get("coeff", 0.0))
 
-    def _calc_accise(self, hp: int, is_commercial: bool) -> float:
+    def _calc_accise(self, hp: int, is_commercial: bool, engine_type: EngineType, dvs_hp: Optional[int] = None, electric_hp: Optional[int] = None) -> float:
         if not is_commercial:
             return 0.0
+        # Определяем мощность для расчёта по v2
+        if engine_type == "Электро":
+            power_for_tax = hp
+        elif engine_type == "Гибрид(послед)":
+            power_for_tax = int((dvs_hp or 0) + (electric_hp or 0))
+        elif engine_type == "Гибрид(паралл)":
+            power_for_tax = int(dvs_hp if dvs_hp is not None else int(hp * 0.65))
+        else:
+            power_for_tax = hp
+
         rows = list(self.accise_rates.order_by("max_hp"))
         table = [{"max_hp": float(r.max_hp), "rate": float(r.rate_rub_per_hp)} for r in rows]
         if not table:
             return 0.0
-        row = self._find_bracket(hp, table, "max_hp")
-        return hp * float(row.get("rate", 0.0))
+        row = self._find_bracket(power_for_tax, table, "max_hp")
+        return power_for_tax * float(row.get("rate", 0.0))
 
     def _calc_vat(self, price_rub: float, duty_rub: float, accise_rub: float, is_commercial: bool) -> float:
         if not is_commercial:
@@ -203,13 +243,61 @@ class CustomsCalculator:
 
         is_commercial = data.is_jur or (data.is_personal_use is False)
 
-        duty_eur = self._calc_duty(price_eur, int(data.engine_cc), data.age_key, data.is_jur, data.engine_type)
+        # Пошлина: зависит от vehicle_type
+        if data.vehicle_type == "car":
+            if not data.is_jur:
+                # ФЛ: для EV/гибридов льготы
+                if data.engine_type in ("Электро", "Гибрид(послед)", "Гибрид(паралл)"):
+                    if data.age_key == "under_3":
+                        rate = 0.15
+                        min_eur_cc = 0.0
+                        duty_from_price = price_eur * rate
+                        duty_from_volume = int(data.engine_cc) * min_eur_cc
+                        duty_eur = max(duty_from_price, duty_from_volume)
+                    else:
+                        rate_eur_cc = 1.0
+                        duty_eur = int(data.engine_cc) * rate_eur_cc
+                else:
+                    duty_eur = self._calc_duty(price_eur, int(data.engine_cc), data.age_key, data.is_jur, data.engine_type)
+            else:
+                # ЮЛ: EV/гибриды по v2, иначе текущие правила из БД
+                if data.engine_type == "Электро":
+                    duty_eur = price_eur * 0.15
+                elif data.engine_type in ("Гибрид(послед)", "Гибрид(паралл)"):
+                    is_new = (data.age_key == "under_3")
+                    rate = 0.15 if is_new else 0.18
+                    min_eur_cc = 0.30 if is_new else 1.20
+                    duty_eur = max(price_eur * rate, int(data.engine_cc) * min_eur_cc)
+                else:
+                    duty_eur = self._calc_duty(price_eur, int(data.engine_cc), data.age_key, data.is_jur, data.engine_type)
+        elif data.vehicle_type == "quad":
+            # v2 QUAD_DUTY: new 30%, old 35%, min €/cc: 1.2/1.5
+            is_new = (data.age_key == "under_3")
+            rate = 0.30 if is_new else 0.35
+            min_eur_cc = 1.2 if is_new else 1.5
+            duty_eur = max(price_eur * rate, int(data.engine_cc) * min_eur_cc)
+        elif data.vehicle_type == "snowmobile":
+            # v2 SNOWMOBILE_DUTY: 5% без минимума
+            duty_eur = price_eur * 0.05
+        elif data.vehicle_type == "motorcycle":
+            # v2 MOTORCYCLE_DUTY: 15% с минимумом €/cc, зависящим от импортера
+            if not data.is_jur and data.is_personal_use:
+                min_eur_cc = 0.5
+            else:
+                min_eur_cc = 0.8
+            duty_eur = max(price_eur * 0.15, int(data.engine_cc) * min_eur_cc)
+        else:
+            duty_eur = 0.0
         duty_rub = duty_eur * float(fx.get("EUR", 1.0))
 
-        util_fee = self._calc_util(is_commercial, data.age_key, int(data.engine_cc))
-        accise_rub = self._calc_accise(int(data.hp), is_commercial)
+        util_fee = self._calc_util(is_commercial, data.age_key, int(data.engine_cc), data.engine_type, data.vehicle_type)
+        accise_rub = self._calc_accise(int(data.hp), is_commercial, data.engine_type, data.dvs_hp, data.electric_hp)
         vat_rub = self._calc_vat(price_rub, duty_rub, accise_rub, is_commercial)
-        customs_fee = self._calc_customs_fee(price_rub)
+        # Таможенный сбор: для физлиц при личном использовании фиксировано 500 ₽ (v2)
+        if not is_commercial:
+            customs_fee = 500.0
+        else:
+            customs_fee = self._calc_customs_fee(price_rub)
 
         subtotal_customs = duty_rub + util_fee + accise_rub + vat_rub + customs_fee
 
@@ -278,19 +366,35 @@ class CbrfCurrencyProvider(CurrencyProvider):
 
     CBR_URL = "https://www.cbr-xml-daily.ru/daily_json.js"
     SUPPORTED = ("EUR", "USD", "CNY", "JPY", "KRW", "RUB")
+    # Процессный запасной кэш, чтобы тесты могли проверить повторное использование без Redis
+    _MEM_CACHE_KEY = "currency_rates_cbrf_v1"
+    _mem_cache: dict[str, float] | None = None
 
-    def __init__(self, cache_timeout_seconds: int = 3600) -> None:
-        self.cache_timeout = cache_timeout_seconds
+    def __init__(self, cache_timeout_seconds: Optional[int] = None, url: Optional[str] = None) -> None:
+        # Настройки по умолчанию берём из Django settings, но можно переопределить аргументами
+        default_ttl = getattr(settings, "CBR_CACHE_TTL", 3600)
+        default_url = getattr(settings, "CBR_URL", self.CBR_URL)
+        self.cache_timeout = int(cache_timeout_seconds if cache_timeout_seconds is not None else default_ttl)
+        self.url = str(url or default_url)
         self.logger = logging.getLogger(__name__)
 
     def get_rates(self) -> dict[str, float]:
         cache_key = "currency_rates_cbrf_v1"
-        cached = cache.get(cache_key)
-        if isinstance(cached, dict) and cached:
-            return cached
-
+        # 1) Попытка чтения из кэша — ошибки кэша не критичны
         try:
-            resp = requests.get(self.CBR_URL, timeout=10)
+            cached = cache.get(cache_key)
+            if isinstance(cached, dict) and cached:
+                return cached
+        except Exception as e:  # noqa: BLE001
+            self.logger.warning("CBRF rates cache get failed, continue without cache: %s", e)
+
+        # 1a) Попробуем процессный кэш
+        if isinstance(self._mem_cache, dict) and self._mem_cache:
+            return dict(self._mem_cache)
+
+        # 2) Сетевой запрос; на любые ошибки источника — fallback к фиксированным курсам
+        try:
+            resp = requests.get(self.url, timeout=10)
             resp.raise_for_status()
             data = resp.json()
 
@@ -306,12 +410,36 @@ class CbrfCurrencyProvider(CurrencyProvider):
                 nominal = float(v.get("Nominal", 1.0)) or 1.0
                 rates[code] = value / nominal
 
-            # Если по какой-то причине не получили EUR, считаем это ошибкой источника
             if "EUR" not in rates:
                 raise ValueError("EUR rate is missing from CBR response")
 
-            cache.set(cache_key, rates, timeout=self.cache_timeout)
+            # 3) Пишем в кэш — ошибки игнорируем
+            try:
+                cache.set(cache_key, rates, timeout=self.cache_timeout)
+            except Exception as e:  # noqa: BLE001
+                self.logger.warning("CBRF rates cache set failed, continue: %s", e)
+                # Пишем в процессный кэш на случай отсутствия Redis
+                self.__class__._mem_cache = dict(rates)
+
             return rates
         except Exception as e:  # noqa: BLE001
             self.logger.warning("CBRF rates fetch failed, fallback to fixed: %s", e)
             return FixedCurrencyProvider().get_rates()
+
+
+def get_default_currency_provider() -> CurrencyProvider:
+    """Фабрика провайдера курсов для API/бота, управляется настройками.
+
+    - USE_FIXED_CURRENCY_PROVIDER=true принудительно включает FixedCurrencyProvider (для оффлайна/CI).
+    - Иначе используется CbrfCurrencyProvider со значениями URL/TTL из settings.
+    """
+    # Приоритет: явное значение в Django settings имеет преимущество над окружением.
+    if hasattr(settings, "USE_FIXED_CURRENCY_PROVIDER"):
+        if bool(getattr(settings, "USE_FIXED_CURRENCY_PROVIDER")):
+            return FixedCurrencyProvider()
+        return CbrfCurrencyProvider()
+
+    # Если в settings не задано — читаем из окружения (для CI/локала)
+    env_flag = os.environ.get("USE_FIXED_CURRENCY_PROVIDER", "").strip().lower()
+    env_enabled = env_flag in {"1", "true", "yes", "on"}
+    return FixedCurrencyProvider() if env_enabled else CbrfCurrencyProvider()

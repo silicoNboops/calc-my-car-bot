@@ -6,6 +6,7 @@ from typing import Any
 
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
+from django.conf import settings
 
 from api.calculator.models import DutyRate, UtilFee, AcciseRate, CustomsFee, Settings
 
@@ -43,6 +44,14 @@ class Command(BaseCommand):
         version_tag = options["version_tag"]
         dry_run = options["dry_run"]
         replace = options["replace"]
+
+        # Защита от загрузки шаблонных фикстур в проде: требуем явный --version-tag
+        env = getattr(settings, "ENVIRONMENT", "local").lower()
+        if env in {"production", "prod"} and not version_tag:
+            raise CommandError(
+                "Refusing to seed rates in production without --version-tag. "
+                "Run with explicit --version-tag=<release_tag>."
+            )
 
         if not fixtures_dir.exists() or not fixtures_dir.is_dir():
             raise CommandError(f"Fixtures directory not found: {fixtures_dir}")

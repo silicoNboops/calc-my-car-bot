@@ -42,16 +42,16 @@ class DutyRate(models.Model):
         ]
         constraints = [
             models.CheckConstraint(
-                check=(
+                condition=(
                     (
-                        models.Q(unit=DutyUnit.EUR_CC) &
-                        models.Q(rate_eur_cc__isnull=False) &
-                        models.Q(rate_percent__isnull=True)
+                        models.Q(unit=DutyUnit.EUR_CC)
+                        & models.Q(rate_eur_cc__isnull=False)
+                        & models.Q(rate_percent__isnull=True)
                     )
                     |
                     (
-                        models.Q(unit__in=[DutyUnit.PERCENT, DutyUnit.VALUE]) &
-                        models.Q(rate_percent__isnull=False)
+                        models.Q(unit__in=[DutyUnit.PERCENT, DutyUnit.VALUE])
+                        & models.Q(rate_percent__isnull=False)
                     )
                 ),
                 name="duty_rate_valid_combination",

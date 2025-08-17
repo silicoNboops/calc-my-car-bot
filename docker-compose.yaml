@@ -1,7 +1,11 @@
 services:
   api:
-    build: .
+    build:
+      context: .
+      args:
+        INSTALL_DEV_ENV: ${ENVIRONMENT:-production}
     environment:
+      ENVIRONMENT: ${ENVIRONMENT:-production}
       WORKERS: ${WORKERS:-2}
       THREADS: ${THREADS:-2}
     command: make run.server.prod
@@ -41,7 +45,9 @@ services:
     env_file:
       - .env
     environment:
-      POSTGRES_INITDB_ARGS: --auth=md5
+      POSTGRES_INITDB_ARGS: --auth=md5 --encoding=UTF8 --locale=C.UTF-8 --lc-collate=C.UTF-8 --lc-ctype=C.UTF-8
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
     volumes:
       - postgres-data:/var/lib/postgresql/data
     networks:

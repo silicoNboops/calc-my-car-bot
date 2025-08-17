@@ -7,7 +7,7 @@ from api.calculator.services import CalculatorService, CbrfCurrencyProvider, Est
 
 
 @pytest.mark.django_db
-def test_util_base_from_settings_affects_util_fee(django_db_reset_sequences) -> None:
+def test_util_base_from_settings_affects_util_fee() -> None:
     # Входные данные: физлицо, under_3 — берётся util_fee kind=personal_new
     data = EstimateInput(
         price=10000.0,

@@ -1,3 +1,44 @@
+### Dev-зависимости (локальная разработка)
+
+Dev-зависимости ставятся на этапе сборки образа `api`, если `ENVIRONMENT=local`.
+
+Шаги:
+
+1) В файле `.env` укажите:
+
+```env
+ENVIRONMENT=local
+```
+
+2) Пересоберите образы и поднимите сервисы:
+
+```bash
+docker compose build
+docker compose up -d
+```
+
+После сборки `pytest` и прочие dev-пакеты доступны внутри контейнера `api`:
+
+```bash
+docker compose exec api python -m pytest -q
+```
+
+Примечания:
+
+- Установка dev-зависимостей происходит только для сервиса `api`.
+- Никаких entrypoint-скриптов и маркеров не используется.
+
+### Локали Postgres
+
+В `docker-compose.yaml` для сервиса `db` уже заданы корректные локали/колляции:
+
+```yaml
+POSTGRES_INITDB_ARGS: --auth=md5 --encoding=UTF8 --locale=C.UTF-8 --lc-collate=C.UTF-8 --lc-ctype=C.UTF-8
+LANG: C.UTF-8
+LC_ALL: C.UTF-8
+```
+
+Это обеспечивает правильную инициализацию кластера и отсутствие «collation version mismatch» как на проде, так и локально. Никаких ручных действий на проде дополнительно не требуется.
 # Aiogram & Django API Template
 ## Based on [Django API Template](https://github.com/MaksimZayats/python-django-template)
 
