@@ -294,10 +294,27 @@ async def choose_age_key(call: CallbackQuery, state: FSMContext, callback_data: 
     engine_cc_fmt = f"{format_amount(engine_cc)} см³" if engine_cc else "—"
     age_title = format_age_key_title(callback_data.key)
     # Пакуем пейлоад как для /calc
+    """
+В 
+services.py
+акциз считается на основе hp только для коммерческого использования/юрлиц:
+см. 
+_calc_accise(self, hp, is_commercial, engine_type, ...)
+.
+Для ФЛ (personal) акциз = 0, и hp не влияет на результат. Поэтому hp=0 безопасен для большинства персональных сценариев.
+Для коммерческих сценариев без запроса мощности результат по акцизу может отличаться от реального. Правильнее будет добавить шаг ввода мощности в визард.
+Предложение на будущее (без внедрения сейчас)
+Добавить шаг ввода мощности:
+Показывать шаг только если is_jur == True или is_personal_use == False.
+Для гибридов/электро — обсудить ввод dvs_hp/electric_hp или упрощённую стратегию.
+Пока временно оставляем hp=0 как разумный дефолт.
+"""
     payload = {
         "price": float(price),
         "currency": str(data.get("currency", "RUB")),
         "engine_cc": int(engine_cc),
+        # TODO потом будем задавать шагом от юзера
+        "hp": 0,
         "engine_type": str(data.get("engine_type", "")),
         "age_key": str(callback_data.key),
         "is_jur": bool(data.get("is_jur", False)),
