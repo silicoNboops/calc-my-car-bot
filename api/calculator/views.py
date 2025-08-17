@@ -30,6 +30,7 @@ class EstimateView(APIView):
                     currency=data["currency"],
                     engine_cc=data["engine_cc"],
                     hp=data["hp"],
+                    vehicle_type=data.get("vehicle_type", "car"),
                     engine_type=data.get("engine_type", "Бензин"),
                     age_key=data.get("age_key", "under_3"),
                     is_jur=data.get("is_jur", False),

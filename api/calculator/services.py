@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import requests
 from typing import Literal, Optional
+import os
 
 from django.core.cache import cache
 from django.db.models import QuerySet
@@ -21,6 +22,7 @@ from api.calculator.models import (
 )
 
 EngineType = Literal["Бензин", "Дизель", "Электро", "Гибрид(послед)", "Гибрид(паралл)"]
+VehicleType = Literal["car", "quad", "snowmobile", "motorcycle"]
 AgeKey = Literal["under_3", "3_to_5", "5_to_7", "over_7", "over_5"]
 Currency = Literal["EUR", "USD", "CNY", "JPY", "KRW", "RUB"]
 
@@ -31,6 +33,7 @@ class EstimateInput:
     currency: Currency
     engine_cc: int
     hp: int
+    vehicle_type: VehicleType = "car"
     engine_type: EngineType = "Бензин"
     age_key: AgeKey = "under_3"
     is_jur: bool = False
@@ -157,21 +160,36 @@ class CustomsCalculator:
                 row = self._find_bracket(engine_cc, rows, "max_cc")
                 return engine_cc * float(row.get("rate_eur_cc", 0.0))
 
-    def _calc_util(self, is_commercial: bool, age_key: str, engine_cc: int, engine_type: EngineType) -> float:
+    def _calc_util(self, is_commercial: bool, age_key: str, engine_cc: int, engine_type: EngineType, vehicle_type: VehicleType = "car") -> float:
         # util_base хранится в Settings (fallback к 20000.0 при отсутствии)
         util_base = float(getattr(self.settings, "util_base", 20000.0) or 20000.0)
-        if not is_commercial:
+        if not is_commercial and vehicle_type == "car":
             row = self.util_fees.filter(kind="personal_new").first() if age_key == "under_3" else self.util_fees.filter(kind="personal_old").first()
             coeff = float(getattr(row, "coeff", 0.0))
             return util_base * coeff
+        elif not is_commercial and vehicle_type != "car":
+            # v2: фикс коэффициенты для quad/snowmobile/motorcycle у ФЛ
+            is_new = (age_key == "under_3")
+            coeff = 1.63 if is_new else 6.1
+            # Для этих ТС util_base отличается от авто: 172500 в v2.
+            # Но мы используем Settings.util_base как базу и умножаем на отношение (172500/20000)=8.625,
+            # чтобы не вводить миграции. При default util_base=20000 это даст корректные суммы.
+            base_multiplier = 8.625
+            return util_base * base_multiplier * coeff
         else:
             # EV/Hybrid коммерческий: по v2 фиксированные коэффициенты, не зависящие от объёма
-            if engine_type in ("Электро", "Гибрид(послед)", "Гибрид(паралл)"):
+            if vehicle_type == "car" and engine_type in ("Электро", "Гибрид(послед)", "Гибрид(паралл)"):
                 if age_key == "under_3":
                     coeff = 1.42  # new_electric/new_hybrid
                 else:
                     coeff = 2.84  # old_electric/old_hybrid
                 return util_base * coeff
+            elif vehicle_type != "car":
+                # Коммерческий quad/snowmobile/motorcycle: те же коэффициенты, что для персональных в v2
+                is_new = (age_key == "under_3")
+                coeff = 1.63 if is_new else 6.1
+                base_multiplier = 8.625
+                return util_base * base_multiplier * coeff
             # ICE коммерческий: как раньше, по объёму из БД
             group = "commercial_under_3" if age_key == "under_3" else "commercial_over_3"
             rows = list(self.util_fees.filter(kind=group).order_by("max_cc"))
@@ -225,36 +243,54 @@ class CustomsCalculator:
 
         is_commercial = data.is_jur or (data.is_personal_use is False)
 
-        # Пошлина: расширение для EV/гибридов по v2
-        if not data.is_jur:
-            # ФЛ: для EV/гибридов льготы
-            if data.engine_type in ("Электро", "Гибрид(послед)", "Гибрид(паралл)"):
-                if data.age_key == "under_3":
-                    rate = 0.15
-                    min_eur_cc = 0.0
-                    duty_from_price = price_eur * rate
-                    duty_from_volume = int(data.engine_cc) * min_eur_cc
-                    duty_eur = max(duty_from_price, duty_from_volume)
+        # Пошлина: зависит от vehicle_type
+        if data.vehicle_type == "car":
+            if not data.is_jur:
+                # ФЛ: для EV/гибридов льготы
+                if data.engine_type in ("Электро", "Гибрид(послед)", "Гибрид(паралл)"):
+                    if data.age_key == "under_3":
+                        rate = 0.15
+                        min_eur_cc = 0.0
+                        duty_from_price = price_eur * rate
+                        duty_from_volume = int(data.engine_cc) * min_eur_cc
+                        duty_eur = max(duty_from_price, duty_from_volume)
+                    else:
+                        rate_eur_cc = 1.0
+                        duty_eur = int(data.engine_cc) * rate_eur_cc
                 else:
-                    rate_eur_cc = 1.0
-                    duty_eur = int(data.engine_cc) * rate_eur_cc
+                    duty_eur = self._calc_duty(price_eur, int(data.engine_cc), data.age_key, data.is_jur, data.engine_type)
             else:
-                duty_eur = self._calc_duty(price_eur, int(data.engine_cc), data.age_key, data.is_jur, data.engine_type)
+                # ЮЛ: EV/гибриды по v2, иначе текущие правила из БД
+                if data.engine_type == "Электро":
+                    duty_eur = price_eur * 0.15
+                elif data.engine_type in ("Гибрид(послед)", "Гибрид(паралл)"):
+                    is_new = (data.age_key == "under_3")
+                    rate = 0.15 if is_new else 0.18
+                    min_eur_cc = 0.30 if is_new else 1.20
+                    duty_eur = max(price_eur * rate, int(data.engine_cc) * min_eur_cc)
+                else:
+                    duty_eur = self._calc_duty(price_eur, int(data.engine_cc), data.age_key, data.is_jur, data.engine_type)
+        elif data.vehicle_type == "quad":
+            # v2 QUAD_DUTY: new 30%, old 35%, min €/cc: 1.2/1.5
+            is_new = (data.age_key == "under_3")
+            rate = 0.30 if is_new else 0.35
+            min_eur_cc = 1.2 if is_new else 1.5
+            duty_eur = max(price_eur * rate, int(data.engine_cc) * min_eur_cc)
+        elif data.vehicle_type == "snowmobile":
+            # v2 SNOWMOBILE_DUTY: 5% без минимума
+            duty_eur = price_eur * 0.05
+        elif data.vehicle_type == "motorcycle":
+            # v2 MOTORCYCLE_DUTY: 15% с минимумом €/cc, зависящим от импортера
+            if not data.is_jur and data.is_personal_use:
+                min_eur_cc = 0.5
+            else:
+                min_eur_cc = 0.8
+            duty_eur = max(price_eur * 0.15, int(data.engine_cc) * min_eur_cc)
         else:
-            # ЮЛ: EV/гибриды по v2, иначе текущие правила из БД
-            if data.engine_type == "Электро":
-                # 0.15 без минимума, new/old одинаково
-                duty_eur = price_eur * 0.15
-            elif data.engine_type in ("Гибрид(послед)", "Гибрид(паралл)"):
-                is_new = (data.age_key == "under_3")
-                rate = 0.15 if is_new else 0.18
-                min_eur_cc = 0.30 if is_new else 1.20
-                duty_eur = max(price_eur * rate, int(data.engine_cc) * min_eur_cc)
-            else:
-                duty_eur = self._calc_duty(price_eur, int(data.engine_cc), data.age_key, data.is_jur, data.engine_type)
+            duty_eur = 0.0
         duty_rub = duty_eur * float(fx.get("EUR", 1.0))
 
-        util_fee = self._calc_util(is_commercial, data.age_key, int(data.engine_cc), data.engine_type)
+        util_fee = self._calc_util(is_commercial, data.age_key, int(data.engine_cc), data.engine_type, data.vehicle_type)
         accise_rub = self._calc_accise(int(data.hp), is_commercial, data.engine_type, data.dvs_hp, data.electric_hp)
         vat_rub = self._calc_vat(price_rub, duty_rub, accise_rub, is_commercial)
         # Таможенный сбор: для физлиц при личном использовании фиксировано 500 ₽ (v2)
@@ -341,11 +377,11 @@ class CbrfCurrencyProvider(CurrencyProvider):
 
     def get_rates(self) -> dict[str, float]:
         cache_key = "currency_rates_cbrf_v1"
-        cached = cache.get(cache_key)
-        if isinstance(cached, dict) and cached:
-            return cached
-
         try:
+            cached = cache.get(cache_key)
+            if isinstance(cached, dict) and cached:
+                return cached
+
             resp = requests.get(self.url, timeout=10)
             resp.raise_for_status()
             data = resp.json()
@@ -379,6 +415,9 @@ def get_default_currency_provider() -> CurrencyProvider:
     - USE_FIXED_CURRENCY_PROVIDER=true принудительно включает FixedCurrencyProvider (для оффлайна/CI).
     - Иначе используется CbrfCurrencyProvider со значениями URL/TTL из settings.
     """
-    if getattr(settings, "USE_FIXED_CURRENCY_PROVIDER", False):
+    # Флаг может прийти как из Django settings, так и из переменных окружения (для CI/локальных тестов)
+    env_flag = os.environ.get("USE_FIXED_CURRENCY_PROVIDER", "").strip().lower()
+    env_enabled = env_flag in {"1", "true", "yes", "on"}
+    if getattr(settings, "USE_FIXED_CURRENCY_PROVIDER", False) or env_enabled:
         return FixedCurrencyProvider()
     return CbrfCurrencyProvider()

@@ -8,6 +8,9 @@ class EstimateRequestSerializer(serializers.Serializer):
     currency = serializers.ChoiceField(choices=["EUR", "USD", "CNY", "JPY", "KRW", "RUB"])
     engine_cc = serializers.IntegerField(min_value=1)
     hp = serializers.IntegerField(min_value=1)
+    vehicle_type = serializers.ChoiceField(
+        choices=["car", "quad", "snowmobile", "motorcycle"], default="car"
+    )
     engine_type = serializers.ChoiceField(
         choices=[
             "Бензин",
@@ -29,6 +32,7 @@ class EstimateRequestSerializer(serializers.Serializer):
         is_jur: bool = attrs.get("is_jur", False)
         age_key: str = attrs.get("age_key", "under_3")
         engine_type: str = attrs.get("engine_type", "Бензин")
+        vehicle_type: str = attrs.get("vehicle_type", "car")
 
         # Default is_personal_use: if not provided, mirror legacy behavior (not is_jur)
         if "is_personal_use" not in attrs:
@@ -52,6 +56,12 @@ class EstimateRequestSerializer(serializers.Serializer):
             # Не заставляем указывать оба, но проверим разумность
             if dvs_hp < 0 or electric_hp < 0:
                 raise serializers.ValidationError({"dvs_hp": "Значение не может быть отрицательным", "electric_hp": "Значение не может быть отрицательным"})
+
+        # Ограничения по типу ТС: для не-"car" запрещаем EV/гибриды
+        if vehicle_type != "car" and engine_type in {"Электро", "Гибрид(послед)", "Гибрид(паралл)"}:
+            raise serializers.ValidationError({
+                "engine_type": "Для выбранного типа ТС поддерживаются только ДВС (Бензин/Дизель)."
+            })
 
         return attrs
 
