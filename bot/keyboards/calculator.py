@@ -65,3 +65,16 @@ def currency_kb() -> InlineKeyboardMarkup:
         builder.button(text=text, callback_data=CurrencyCD(code=code).pack())
     builder.adjust(1)
     return builder.as_markup()
+
+
+# Helpers for readable titles (emoji + text) for summaries
+def format_vehicle_title(value: str) -> str:
+    label = dict(VehicleType.choices).get(value, value)
+    emoji = _VEHICLE_EMOJI.get(value, "")
+    return f"{emoji} {label}".strip()
+
+
+def format_currency_title(code: str) -> str:
+    title = _CURRENCY_TITLES_RU.get(code, dict(Currency.choices).get(code, code))
+    flag = _CURRENCY_FLAGS.get(code, "")
+    return f"{flag} {title}".strip()
