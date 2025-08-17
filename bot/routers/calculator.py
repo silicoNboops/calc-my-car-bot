@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
 
-from bot.keyboards.calculator import VehicleTypeCD
+from bot.keyboards.calculator import VehicleTypeCD, CurrencyCD, currency_kb
 from bot.states import CalculatorState
 
 if TYPE_CHECKING:
@@ -16,10 +16,31 @@ router = Router()
 
 @router.callback_query(CalculatorState.VEHICLE_TYPE, VehicleTypeCD.filter())
 async def choose_vehicle_type(call: CallbackQuery, state: FSMContext, callback_data: VehicleTypeCD) -> None:
-    # Сохраняем выбранный тип ТС в FSM
+    # 1) Сохраняем выбранный тип ТС
     await state.update_data(vehicle_type=callback_data.type)
-    # Пока только подтверждаем выбор; следующие шаги добавим позже
+    # 2) Переходим к следующему шагу — выбор валюты
+    await state.set_state(CalculatorState.CURRENCY)
+    # 3) Редактируем текущее сообщение (не создаём новое), показываем клавиатуру валют
     await call.message.edit_text(
-        f"Вы выбрали тип: <b>{callback_data.type}</b>\nСледующие шаги мастера скоро добавлю.",
+        "Выберите, в какой валюте будет указана цена автомобиля:",
+        reply_markup=currency_kb(),
+    )
+    await call.answer()
+
+
+@router.callback_query(CalculatorState.CURRENCY, CurrencyCD.filter())
+async def choose_currency(call: CallbackQuery, state: FSMContext, callback_data: CurrencyCD) -> None:
+    # Сохраняем валюту и подтверждаем выбор
+    await state.update_data(currency=callback_data.code)
+    data = await state.get_data()
+    vehicle_type = data.get("vehicle_type")
+    await call.message.edit_text(
+        (
+            "Выбор сделан:\n"
+            f"— Тип авто: <b>{vehicle_type}</b>\n"
+            f"— Валюта: <b>{callback_data.code}</b>\n\n"
+            "Следующий шаг мастера добавлю далее."
+        ),
+        reply_markup=None,
     )
     await call.answer()
