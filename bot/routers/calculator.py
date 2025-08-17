@@ -4,8 +4,8 @@ import re
 from typing import TYPE_CHECKING
 
 from aiogram import Router, F
-from aiogram.fsm.context import FSMContext
 from aiogram.exceptions import TelegramBadRequest
+from aiogram.fsm.context import FSMContext
 from asgiref.sync import sync_to_async
 
 from api.calculator.choices import Currency as CurrencyChoices, EngineType as EngineTypeChoices, \
@@ -86,11 +86,6 @@ async def _edit_or_send(message, text: str, reply_markup=None) -> None:
     except TelegramBadRequest:
         await message.answer(text, reply_markup=reply_markup)
 
- 
-
-
- 
-
 
 @router.callback_query(CalculatorState.VEHICLE_TYPE, VehicleTypeCD.filter())
 async def choose_vehicle_type(call: CallbackQuery, state: FSMContext, callback_data: VehicleTypeCD) -> None:
@@ -102,7 +97,8 @@ async def choose_vehicle_type(call: CallbackQuery, state: FSMContext, callback_d
     # Показываем заголовок с выбранным типом и просим выбрать валюту
     cur_data = {"vehicle_type": callback_data.type}
     header = format_selection_header(cur_data)
-    await call.message.edit_text(header + "Выберите, в какой валюте будет указана цена автомобиля:", reply_markup=currency_kb())
+    await call.message.edit_text(header + "Выберите, в какой валюте будет указана цена автомобиля:",
+                                 reply_markup=currency_kb())
     await call.answer()
 
 
@@ -115,7 +111,8 @@ async def choose_currency(call: CallbackQuery, state: FSMContext, callback_data:
     await state.update_data(currency_title=currency_label)
     # Заголовок с авто и валютой, затем просьба ввести цену
     header = format_selection_header({**data, "currency": callback_data.code, "currency_title": currency_label})
-    msg = await call.message.edit_text(header + "Введите стоимость автомобиля (например, 💰 1 200 000):", reply_markup=None)
+    msg = await call.message.edit_text(header + "Введите стоимость автомобиля (например, 💰 1 200 000):",
+                                       reply_markup=None)
     # Переходим к вводу стоимости и запоминаем id сообщения с промптом
     await state.update_data(prompt_chat_id=msg.chat.id, prompt_message_id=msg.message_id, currency_title=currency_label)
     await state.set_state(CalculatorState.PRICE)
@@ -145,8 +142,6 @@ def _parse_price(raw: str) -> int | None:
     if value <= 0:
         return None
     return value
-
- 
 
 
 @router.message(CalculatorState.PRICE, F.text)
@@ -294,7 +289,8 @@ async def input_engine_cc(message: Message, state: FSMContext) -> None:
         header2 = format_selection_header({**data, "engine_cc": value})
         prompt_text = header2 + "Выберите возраст автомобиля:"
         try:
-            await message.bot.edit_message_text(chat_id=chat_id, message_id=msg_id, text=prompt_text, reply_markup=age_key_kb())
+            await message.bot.edit_message_text(chat_id=chat_id, message_id=msg_id, text=prompt_text,
+                                                reply_markup=age_key_kb())
         except TelegramBadRequest:
             await message.answer(prompt_text, reply_markup=age_key_kb())
     else:
