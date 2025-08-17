@@ -59,6 +59,23 @@ def _seed_customs_rates(django_db_setup, django_db_blocker):
 
 Это локально к модулю тестов и не влияет на остальные тесты. JSON-фикстуры лежат в `api/calculator/fixtures/`.
 
+## Тесты провайдера курсов ЦБ РФ
+
+Добавлен модуль `tests/unit/test_currency_provider.py` для проверки `CbrfCurrencyProvider`:
+
+- Проверяется корректный разбор ответа ЦБ и использование кэша между вызовами (без повторного HTTP-запроса).
+- При отсутствии курса EUR или сетевой ошибке включается безопасный fallback на `FixedCurrencyProvider`.
+- Сетевые вызовы замоканы через `unittest.mock.patch` (`requests.get`), кэш Django очищается адресно по ключу `currency_rates_cbrf_v1`.
+
+Запуск только тестов провайдера (в Docker и на SQLite in-memory):
+
+```bash
+docker compose exec \
+  -e USE_TEST_DB=1 \
+  -e TEST_DATABASE_URL=sqlite:///:memory: \
+  api pytest -q tests/unit/test_currency_provider.py
+```
+
 ## Полезное
 
 - Конфигурация pytest: `pyproject.toml` → `[tool.pytest.ini_options]`.
