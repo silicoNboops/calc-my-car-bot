@@ -9,7 +9,7 @@ from api.user.models import User
 from asgiref.sync import sync_to_async
 from api.calculator.services import (
     CalculatorService,
-    CbrfCurrencyProvider,
+    get_default_currency_provider,
     EstimateInput,
 )
 
@@ -117,7 +117,7 @@ def _format_result(res) -> str:  # type: ignore[no-untyped-def]
 
 def _estimate_sync(payload: dict) -> dict:
     """Синхронная часть: берёт ORM-данные и считает результат."""
-    service = CalculatorService(currency_provider=CbrfCurrencyProvider())
+    service = CalculatorService(currency_provider=get_default_currency_provider())
     calc = service.build_calculator()
     res = calc.estimate(EstimateInput(**payload))
     return _format_result(res)

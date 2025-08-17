@@ -14,7 +14,13 @@ def _fake_cbr_json(valutes: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
 
 
 def _clear_provider_cache() -> None:
-    cache.delete("currency_rates_cbrf_v1")
+    try:
+        cache.delete("currency_rates_cbrf_v1")
+    except Exception:
+        # В среде без Redis (локальные/CI-тесты) игнорируем ошибки удаления
+        pass
+    # Сбросим процессный кэш провайдера на случай отсутствия Redis
+    CbrfCurrencyProvider._mem_cache = None
 
 
 def test_cbrf_provider_success_uses_cache_between_calls() -> None:
