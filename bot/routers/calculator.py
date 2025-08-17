@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
+from asgiref.sync import sync_to_async
 
 from api.calculator.choices import ImporterKind
 from bot.keyboards.calculator import (
@@ -23,6 +24,12 @@ from bot.keyboards.calculator import (
     age_key_kb,
     format_age_key_title,
 )
+from api.calculator.services import (
+    CalculatorService,
+    EstimateInput,
+    get_default_currency_provider,
+)
+from api.calculator.choices import Currency as CurrencyChoices, EngineType as EngineTypeChoices, VehicleType as VehicleTypeChoices, AgeKey as AgeKeyChoices
 from bot.states import CalculatorState
 
 if TYPE_CHECKING:
@@ -30,6 +37,43 @@ if TYPE_CHECKING:
 
 router = Router()
 
+
+def _format_calc_result(res) -> str:  # type: ignore[no-untyped-def]
+    return (
+        "Итог расчёта:\n"
+        f"Цена (RUB): <b>{res.price_rub:,.2f}</b>\n"
+        f"Цена (EUR): <b>{res.price_eur:,.2f}</b>\n"
+        f"Пошлина (EUR): <b>{res.duty_eur:,.2f}</b>\n"
+        f"Пошлина (RUB): <b>{res.duty_rub:,.2f}</b>\n"
+        f"Утильсбор (RUB): <b>{res.util_fee:,.2f}</b>\n"
+        f"Акциз (RUB): <b>{res.accise_rub:,.2f}</b>\n"
+        f"НДС (RUB): <b>{res.vat_rub:,.2f}</b>\n"
+        f"Таможенный сбор (RUB): <b>{res.customs_fee:,.2f}</b>\n"
+        f"Всего (RUB): <b>{res.subtotal_customs:,.2f}</b>\n"
+    )
+
+
+def _estimate_sync(payload: dict) -> tuple[str, dict[str, float]]:
+    """Синхронный расчёт через CalculatorService, в стиле /calc."""
+    provider = get_default_currency_provider()
+    service = CalculatorService(currency_provider=provider)
+    calc = service.build_calculator()
+    # Приводим типы к TextChoices, если пришли строки
+    data = dict(payload)
+    try:
+        if not isinstance(data.get("currency"), CurrencyChoices):
+            data["currency"] = CurrencyChoices(data["currency"])  # type: ignore[arg-type]
+        if not isinstance(data.get("engine_type"), EngineTypeChoices):
+            data["engine_type"] = EngineTypeChoices(data["engine_type"])  # type: ignore[arg-type]
+        if not isinstance(data.get("vehicle_type"), VehicleTypeChoices):
+            data["vehicle_type"] = VehicleTypeChoices(data["vehicle_type"])  # type: ignore[arg-type]
+        if not isinstance(data.get("age_key"), AgeKeyChoices):
+            data["age_key"] = AgeKeyChoices(data["age_key"])  # type: ignore[arg-type]
+    except Exception:
+        # Если не удалось привести — пусть выбросится позже в расчёте
+        pass
+    res = calc.estimate(EstimateInput(**data))
+    return _format_calc_result(res), provider.get_rates()
 
 @router.callback_query(CalculatorState.VEHICLE_TYPE, VehicleTypeCD.filter())
 async def choose_vehicle_type(call: CallbackQuery, state: FSMContext, callback_data: VehicleTypeCD) -> None:
@@ -318,18 +362,51 @@ async def choose_age_key(call: CallbackQuery, state: FSMContext, callback_data: 
     engine_cc = int(data.get("engine_cc", 0))
     engine_cc_fmt = f"{_format_amount(engine_cc)} см³" if engine_cc else "—"
     age_title = format_age_key_title(callback_data.key)
-    await call.message.edit_text(
-        (
-            "Выбор сделан:\n"
-            f"— Тип авто: <b>{vehicle_title}</b>\n"
-            f"— Валюта: <b>{currency_title}</b>\n"
-            f"— Стоимость: <b>💰 {amount_fmt}</b>\n"
-            f"— Кто ввозит: <b>{importer_title}</b>\n"
-            f"— Тип двигателя: <b>{engine_title}</b>\n"
-            f"— Объём: <b>🧱 {engine_cc_fmt}</b>\n"
-            f"— Возраст: <b>{age_title}</b>\n\n"
-            "Следующий шаг мастера добавлю далее."
-        ),
-        reply_markup=None,
+    # Пакуем пейлоад как для /calc
+    payload = {
+        "price": float(price),
+        "currency": str(data.get("currency", "RUB")),
+        "engine_cc": int(engine_cc),
+        "hp": int(data.get("hp", 0) or 0),  # hp шага пока нет — используем 0
+        "engine_type": str(data.get("engine_type", "")),
+        "age_key": str(callback_data.key),
+        "is_jur": bool(data.get("is_jur", False)),
+        "is_personal_use": data.get("is_personal_use", None),
+        "vehicle_type": str(data.get("vehicle_type", "car")),
+    }
+    try:
+        result_text, rates = await sync_to_async(_estimate_sync)(payload)
+    except Exception as e:  # noqa: BLE001
+        await call.message.edit_text(f"Ошибка расчёта: {e}")
+        await call.answer()
+        await state.clear()
+        return
+
+    # Курс для выбранной валюты
+    cur_code = str(data.get("currency", "RUB"))
+    fx_line = ""
+    try:
+        if cur_code and cur_code != "RUB" and cur_code in rates and "RUB" in rates:
+            rub_per_cur = float(rates[cur_code])
+            fx_line = f"\nРасчёты произведены на актуальном курсе: 1 {cur_code} = {rub_per_cur:.4f} ₽\n"
+    except Exception:
+        fx_line = ""
+
+    header = (
+        "Выбор сделан:\n"
+        f"— Тип авто: <b>{vehicle_title}</b>\n"
+        f"— Валюта: <b>{currency_title}</b>\n"
+        f"— Стоимость: <b>💰 {amount_fmt}</b>\n"
+        f"— Кто ввозит: <b>{importer_title}</b>\n"
+        f"— Тип двигателя: <b>{engine_title}</b>\n"
+        f"— Объём: <b>🧱 {engine_cc_fmt}</b>\n"
+        f"— Возраст: <b>{age_title}</b>\n\n"
     )
+
+    contact = "\nСвяжитесь с нами: @Slaford - Слафординка"
+
+    final_text = header + result_text + fx_line + contact
+    await call.message.edit_text(final_text, reply_markup=None)
     await call.answer()
+    # Сбрасываем состояние и данные визарда
+    await state.clear()
