@@ -1,3 +1,32 @@
+### Dev-зависимости автоматически в local
+
+При старте контейнера `api` исполняется `docker/entrypoint.sh`. Если переменная окружения `ENVIRONMENT=local` и в корне есть `requirements-dev.txt`, то автоматически выполняется:
+
+```bash
+pip install -r requirements-dev.txt
+```
+
+Установка делается один раз за жизненный цикл тома — ставится маркер-файл `.dev_deps_installed`, чтобы не тратить время на каждый рестарт. В прод-окружении (любое `ENVIRONMENT` кроме `local`) установка dev-зависимостей пропускается.
+
+Чтобы включить режим `local`, выставьте в `.env`:
+
+```env
+ENVIRONMENT=local
+```
+
+И перезапустите контейнеры.
+
+### Локали Postgres
+
+В `docker-compose.yaml` для сервиса `db` уже заданы корректные локали/колляции:
+
+```yaml
+POSTGRES_INITDB_ARGS: --auth=md5 --encoding=UTF8 --locale=C.UTF-8 --lc-collate=C.UTF-8 --lc-ctype=C.UTF-8
+LANG: C.UTF-8
+LC_ALL: C.UTF-8
+```
+
+Это обеспечивает правильную инициализацию кластера и отсутствие «collation version mismatch» как на проде, так и локально. Никаких ручных действий на проде дополнительно не требуется.
 # Aiogram & Django API Template
 ## Based on [Django API Template](https://github.com/MaksimZayats/python-django-template)
 
