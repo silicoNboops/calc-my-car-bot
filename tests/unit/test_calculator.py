@@ -215,6 +215,115 @@ def test_hybrid_parallel_jur_over5_min_rule() -> None:
 
 
 @pytest.mark.django_db()
+def test_ev_phys_over5_rules() -> None:
+    """Физлицо, электро, >=3 лет: duty = 1 EUR/см³; VAT=0; accise=0; util=5200; customs_fee=500."""
+    client = APIClient()
+    payload = {
+        "price": 10000.0,
+        "currency": "EUR",
+        "engine_cc": 2000,
+        "hp": 150,
+        "engine_type": "Электро",
+        "age_key": "over_5",
+        "is_jur": False,
+        "is_personal_use": True,
+    }
+    resp = client.post(reverse("calculator:estimate"), data=payload, format="json")
+    assert resp.status_code == status.HTTP_200_OK, resp.content
+    data = resp.json()
+    # duty_eur = 1 * 2000
+    assert pytest.approx(data["duty_eur"], rel=1e-6) == 2000.0
+    # util_fee = 5200 (старше 3 лет для ФЛ)
+    assert pytest.approx(data["util_fee"], rel=1e-6) == 5200.0
+    assert data["accise_rub"] == 0.0
+    assert data["vat_rub"] == 0.0
+    assert data["customs_fee"] == 500.0
+
+
+@pytest.mark.django_db()
+def test_hybrid_series_jur_accise_uses_sum_hp_vs_parallel() -> None:
+    """ЮЛ: у последовательного гибрида акциз считается по сумме мощностей и >0, у параллельного с тем же dvs_hp может быть 0."""
+    client = APIClient()
+
+    # Series: dvs_hp + electric_hp = 200 hp => ожидаем положительный акциз
+    series_payload = {
+        "price": 15000.0,
+        "currency": "EUR",
+        "engine_cc": 1800,
+        "hp": 200,
+        "engine_type": "Гибрид(послед)",
+        "age_key": "under_3",
+        "is_jur": True,
+        "is_personal_use": False,
+        "dvs_hp": 80,
+        "electric_hp": 120,
+    }
+    r1 = client.post(reverse("calculator:estimate"), data=series_payload, format="json")
+    assert r1.status_code == status.HTTP_200_OK, r1.content
+    d1 = r1.json()
+    assert d1["accise_rub"] > 0.0
+
+    # Parallel: используем только dvs_hp=80 => в наших ставках это 0
+    parallel_payload = {
+        "price": 15000.0,
+        "currency": "EUR",
+        "engine_cc": 1800,
+        "hp": 200,
+        "engine_type": "Гибрид(паралл)",
+        "age_key": "under_3",
+        "is_jur": True,
+        "is_personal_use": False,
+        "dvs_hp": 80,
+    }
+    r2 = client.post(reverse("calculator:estimate"), data=parallel_payload, format="json")
+    assert r2.status_code == status.HTTP_200_OK, r2.content
+    d2 = r2.json()
+    assert d2["accise_rub"] == 0.0
+
+
+@pytest.mark.django_db()
+def test_hybrid_parallel_jur_fallback_without_dvs_hp() -> None:
+    """ЮЛ: параллельный гибрид без dvs_hp использует fallback 65% от hp для акциза (ожидаем > 0)."""
+    client = APIClient()
+    payload = {
+        "price": 12000.0,
+        "currency": "EUR",
+        "engine_cc": 1600,
+        "hp": 200,
+        "engine_type": "Гибрид(паралл)",
+        "age_key": "under_3",
+        "is_jur": True,
+        "is_personal_use": False,
+        # dvs_hp отсутствует — задействуется fallback
+    }
+    resp = client.post(reverse("calculator:estimate"), data=payload, format="json")
+    assert resp.status_code == status.HTTP_200_OK, resp.content
+    data = resp.json()
+    assert data["accise_rub"] > 0.0
+
+
+@pytest.mark.django_db()
+def test_phys_commercial_customs_fee_not_fixed() -> None:
+    """ФЛ, но коммерческое использование: таможенный сбор не фикс 500."""
+    client = APIClient()
+    payload = {
+        "price": 8000.0,
+        "currency": "EUR",
+        "engine_cc": 1600,
+        "hp": 110,
+        "engine_type": "Бензин",
+        "age_key": "under_3",
+        "is_jur": False,
+        "is_personal_use": False,
+    }
+    resp = client.post(reverse("calculator:estimate"), data=payload, format="json")
+    assert resp.status_code == status.HTTP_200_OK, resp.content
+    data = resp.json()
+    assert data["customs_fee"] != 500.0
+    assert data["customs_fee"] > 500.0
+
+
+@pytest.mark.django_db()
 @pytest.mark.parametrize("case", [
     {
         "title": "Физ <3 лет бензин 1999см³ 150лс 20k EUR",
