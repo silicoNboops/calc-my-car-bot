@@ -366,6 +366,9 @@ class CbrfCurrencyProvider(CurrencyProvider):
 
     CBR_URL = "https://www.cbr-xml-daily.ru/daily_json.js"
     SUPPORTED = ("EUR", "USD", "CNY", "JPY", "KRW", "RUB")
+    # Процессный запасной кэш, чтобы тесты могли проверить повторное использование без Redis
+    _MEM_CACHE_KEY = "currency_rates_cbrf_v1"
+    _mem_cache: dict[str, float] | None = None
 
     def __init__(self, cache_timeout_seconds: Optional[int] = None, url: Optional[str] = None) -> None:
         # Настройки по умолчанию берём из Django settings, но можно переопределить аргументами
@@ -377,11 +380,20 @@ class CbrfCurrencyProvider(CurrencyProvider):
 
     def get_rates(self) -> dict[str, float]:
         cache_key = "currency_rates_cbrf_v1"
+        # 1) Попытка чтения из кэша — ошибки кэша не критичны
         try:
             cached = cache.get(cache_key)
             if isinstance(cached, dict) and cached:
                 return cached
+        except Exception as e:  # noqa: BLE001
+            self.logger.warning("CBRF rates cache get failed, continue without cache: %s", e)
 
+        # 1a) Попробуем процессный кэш
+        if isinstance(self._mem_cache, dict) and self._mem_cache:
+            return dict(self._mem_cache)
+
+        # 2) Сетевой запрос; на любые ошибки источника — fallback к фиксированным курсам
+        try:
             resp = requests.get(self.url, timeout=10)
             resp.raise_for_status()
             data = resp.json()
@@ -398,11 +410,17 @@ class CbrfCurrencyProvider(CurrencyProvider):
                 nominal = float(v.get("Nominal", 1.0)) or 1.0
                 rates[code] = value / nominal
 
-            # Если по какой-то причине не получили EUR, считаем это ошибкой источника
             if "EUR" not in rates:
                 raise ValueError("EUR rate is missing from CBR response")
 
-            cache.set(cache_key, rates, timeout=self.cache_timeout)
+            # 3) Пишем в кэш — ошибки игнорируем
+            try:
+                cache.set(cache_key, rates, timeout=self.cache_timeout)
+            except Exception as e:  # noqa: BLE001
+                self.logger.warning("CBRF rates cache set failed, continue: %s", e)
+                # Пишем в процессный кэш на случай отсутствия Redis
+                self.__class__._mem_cache = dict(rates)
+
             return rates
         except Exception as e:  # noqa: BLE001
             self.logger.warning("CBRF rates fetch failed, fallback to fixed: %s", e)
@@ -415,9 +433,13 @@ def get_default_currency_provider() -> CurrencyProvider:
     - USE_FIXED_CURRENCY_PROVIDER=true принудительно включает FixedCurrencyProvider (для оффлайна/CI).
     - Иначе используется CbrfCurrencyProvider со значениями URL/TTL из settings.
     """
-    # Флаг может прийти как из Django settings, так и из переменных окружения (для CI/локальных тестов)
+    # Приоритет: явное значение в Django settings имеет преимущество над окружением.
+    if hasattr(settings, "USE_FIXED_CURRENCY_PROVIDER"):
+        if bool(getattr(settings, "USE_FIXED_CURRENCY_PROVIDER")):
+            return FixedCurrencyProvider()
+        return CbrfCurrencyProvider()
+
+    # Если в settings не задано — читаем из окружения (для CI/локала)
     env_flag = os.environ.get("USE_FIXED_CURRENCY_PROVIDER", "").strip().lower()
     env_enabled = env_flag in {"1", "true", "yes", "on"}
-    if getattr(settings, "USE_FIXED_CURRENCY_PROVIDER", False) or env_enabled:
-        return FixedCurrencyProvider()
-    return CbrfCurrencyProvider()
+    return FixedCurrencyProvider() if env_enabled else CbrfCurrencyProvider()
