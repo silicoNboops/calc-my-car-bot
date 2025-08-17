@@ -14,7 +14,10 @@ from bot.keyboards.calculator import (
     format_currency_title,
     RoleCD,
     role_kb,
-    format_role_title,
+    format_importer_kind_title,
+    EngineTypeCD,
+    engine_type_kb,
+    format_engine_type_title,
 )
 from api.calculator.choices import ImporterKind
 from bot.states import CalculatorState
@@ -177,14 +180,38 @@ async def choose_role(call: CallbackQuery, state: FSMContext, callback_data: Rol
     currency_title = data.get("currency_title") or format_currency_title(str(data.get("currency", "")))
     price = int(data.get("price", 0))
     amount_fmt = _format_amount(price)
-    role_title = format_role_title(kind)
+    importer_title = format_importer_kind_title(kind)
+    prompt_text = (
+        "Выбор сделан:\n"
+        f"— Тип авто: <b>{vehicle_title}</b>\n"
+        f"— Валюта: <b>{currency_title}</b>\n"
+        f"— Стоимость: <b>💰 {amount_fmt}</b>\n"
+        f"— Кто ввозит: <b>{importer_title}</b>\n\n"
+        "Выберите тип двигателя:"
+    )
+    await call.message.edit_text(prompt_text, reply_markup=engine_type_kb())
+    await call.answer()
+    await state.set_state(CalculatorState.ENGINE_TYPE)
+
+
+@router.callback_query(CalculatorState.ENGINE_TYPE, EngineTypeCD.filter())
+async def choose_engine_type(call: CallbackQuery, state: FSMContext, callback_data: EngineTypeCD) -> None:
+    await state.update_data(engine_type=callback_data.kind)
+    data = await state.get_data()
+    vehicle_title = data.get("vehicle_title") or format_vehicle_title(str(data.get("vehicle_type", "")))
+    currency_title = data.get("currency_title") or format_currency_title(str(data.get("currency", "")))
+    price = int(data.get("price", 0))
+    amount_fmt = _format_amount(price)
+    importer_title = format_importer_kind_title(str(data.get("importer_kind", "")))
+    engine_title = format_engine_type_title(callback_data.kind)
     await call.message.edit_text(
         (
             "Выбор сделан:\n"
             f"— Тип авто: <b>{vehicle_title}</b>\n"
             f"— Валюта: <b>{currency_title}</b>\n"
             f"— Стоимость: <b>💰 {amount_fmt}</b>\n"
-            f"— Кто ввозит: <b>{role_title}</b>\n\n"
+            f"— Кто ввозит: <b>{importer_title}</b>\n"
+            f"— Тип двигателя: <b>{engine_title}</b>\n\n"
             "Следующий шаг мастера добавлю далее."
         ),
         reply_markup=None,

@@ -4,7 +4,7 @@ from aiogram.filters.callback_data import CallbackData
 from aiogram.types import InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from api.calculator.choices import VehicleType, Currency, ImporterKind
+from api.calculator.choices import VehicleType, Currency, ImporterKind, EngineType
 
 # Человекочитаемые названия валют для отображения в кнопках
 _CURRENCY_TITLES_RU: dict[str, str] = {
@@ -105,7 +105,37 @@ def role_kb() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def format_role_title(kind: str) -> str:
+def format_importer_kind_title(kind: str) -> str:
     title = _ROLE_TITLES.get(kind, dict(ImporterKind.choices).get(kind, kind))
     emoji = _ROLE_EMOJI.get(kind, "")
+    return f"{emoji} {title}".strip()
+
+
+# ENGINE TYPE
+class EngineTypeCD(CallbackData, prefix="eng"):
+    kind: str  # values from EngineType choices
+
+
+_ENGINE_EMOJI: dict[str, str] = {
+    EngineType.BENZIN: "🛢️",
+    EngineType.DIESEL: "🛢️",
+    EngineType.ELECTRO: "⚡",
+    EngineType.HYBRID_PARALLEL: "♻️",
+    EngineType.HYBRID_SERIES: "♻️",
+}
+
+
+def engine_type_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    for kind, title in EngineType.choices:
+        emoji = _ENGINE_EMOJI.get(kind, "")
+        text = f"{emoji} {title}".strip()
+        builder.button(text=text, callback_data=EngineTypeCD(kind=kind).pack())
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def format_engine_type_title(kind: str) -> str:
+    title = dict(EngineType.choices).get(kind, kind)
+    emoji = _ENGINE_EMOJI.get(kind, "")
     return f"{emoji} {title}".strip()
