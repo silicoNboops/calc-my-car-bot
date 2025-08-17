@@ -8,6 +8,7 @@ from rest_framework.test import APIClient
 
 from api.calculator.serializers import EstimateRequestSerializer
 from api.calculator.services import CalculatorService, FixedCurrencyProvider, EstimateInput
+from api.calculator.models import DutyRate, Audience, AgeGroup, DutyUnit, CustomsFee
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -50,6 +51,103 @@ def test_serializer_normalizes_phys_over7_to_over5() -> None:
     assert s.validated_data["age_key"] == "over_5"
     # is_personal_use should default to not is_jur
     assert s.validated_data["is_personal_use"] is True
+
+
+@pytest.mark.django_db()
+def test_boundary_phys_under3_price_bracket_duty_exact_max() -> None:
+    # Берём первый брекет по цене для физлиц <3 лет
+    row = (
+        DutyRate.objects
+        .filter(audience=Audience.PASSENGER_CAR_PHYS, age_group=AgeGroup.UNDER_3, unit__in=[DutyUnit.PERCENT, DutyUnit.VALUE])
+        .order_by("max_value")
+        .first()
+    )
+    assert row is not None
+    price_eur = float(row.max_value)
+    rate_percent = float(row.rate_percent or 0.0)
+    min_rate_eur_cc = float(row.min_rate_eur_cc or 0.0)
+
+    engine_cc = 1600
+    expected_duty = max(price_eur * rate_percent, engine_cc * min_rate_eur_cc)
+
+    client = APIClient()
+    resp = client.post(
+        reverse("calculator:estimate"),
+        data={
+            "price": price_eur,
+            "currency": "EUR",
+            "engine_cc": engine_cc,
+            "hp": 100,
+            "engine_type": "Бензин",
+            "age_key": "under_3",
+            "is_jur": False,
+            "is_personal_use": True,
+        },
+        format="json",
+    )
+    assert resp.status_code == status.HTTP_200_OK, resp.content
+    data = resp.json()
+    assert pytest.approx(data["duty_eur"], rel=1e-6) == expected_duty
+
+
+@pytest.mark.django_db()
+def test_boundary_phys_over5_volume_bracket_duty_exact_max_cc() -> None:
+    # Берём первый брекет €/см³ по объёму для физлиц >5 лет
+    row = (
+        DutyRate.objects
+        .filter(audience=Audience.PASSENGER_CAR_PHYS, age_group=AgeGroup.OVER_5, unit=DutyUnit.EUR_CC)
+        .order_by("max_value")
+        .first()
+    )
+    assert row is not None
+    max_cc = int(row.max_value)
+    rate_eur_cc = float(row.rate_eur_cc or 0.0)
+
+    client = APIClient()
+    resp = client.post(
+        reverse("calculator:estimate"),
+        data={
+            "price": 10000.0,
+            "currency": "EUR",
+            "engine_cc": max_cc,
+            "hp": 100,
+            "engine_type": "Бензин",
+            "age_key": "over_5",
+            "is_jur": False,
+            "is_personal_use": True,
+        },
+        format="json",
+    )
+    assert resp.status_code == status.HTTP_200_OK, resp.content
+    data = resp.json()
+    expected_duty = max_cc * rate_eur_cc
+    assert pytest.approx(data["duty_eur"], rel=1e-6) == expected_duty
+
+
+@pytest.mark.django_db()
+def test_boundary_customs_fee_exact_max_value_rub() -> None:
+    fee_row = CustomsFee.objects.order_by("max_value_rub").first()
+    assert fee_row is not None
+    price_rub = float(fee_row.max_value_rub)
+
+    client = APIClient()
+    resp = client.post(
+        reverse("calculator:estimate"),
+        data={
+            "price": price_rub,
+            "currency": "RUB",
+            "engine_cc": 1600,
+            "hp": 100,
+            "engine_type": "Бензин",
+            "age_key": "under_3",
+            "is_jur": False,
+            "is_personal_use": True,
+        },
+        format="json",
+    )
+    assert resp.status_code == status.HTTP_200_OK, resp.content
+    data = resp.json()
+    assert pytest.approx(data["customs_fee"], rel=1e-6) == float(fee_row.fee_rub)
 
 
 @pytest.mark.django_db()
