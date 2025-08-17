@@ -34,6 +34,8 @@ class EstimateView(APIView):
                     age_key=data.get("age_key", "under_3"),
                     is_jur=data.get("is_jur", False),
                     is_personal_use=data.get("is_personal_use"),
+                    dvs_hp=data.get("dvs_hp"),
+                    electric_hp=data.get("electric_hp"),
                 )
             )
         except NotImplementedError:
