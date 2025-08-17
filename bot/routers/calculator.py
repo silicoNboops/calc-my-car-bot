@@ -1,6 +1,8 @@
+ 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+import re
 
 from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
@@ -16,7 +18,7 @@ from bot.states import CalculatorState
 from api.calculator.choices import VehicleType
 
 if TYPE_CHECKING:
-    from aiogram.types import CallbackQuery
+    from aiogram.types import CallbackQuery, Message
 
 router = Router()
 
@@ -46,13 +48,84 @@ async def choose_currency(call: CallbackQuery, state: FSMContext, callback_data:
     data = await state.get_data()
     vehicle_type = format_vehicle_title(str(data.get("vehicle_type", "")))
     currency_label = format_currency_title(callback_data.code)
-    await call.message.edit_text(
+    msg = await call.message.edit_text(
         (
             "Выбор сделан:\n"
             f"— Тип авто: <b>{vehicle_type}</b>\n"
             f"— Валюта: <b>{currency_label}</b>\n\n"
-            "Следующий шаг мастера добавлю далее."
+            "Введите стоимость автомобиля (например, 1 200 000):"
         ),
         reply_markup=None,
     )
+    # Переходим к вводу стоимости и запоминаем id сообщения с промптом
+    await state.update_data(prompt_chat_id=msg.chat.id, prompt_message_id=msg.message_id, vehicle_title=vehicle_type, currency_title=currency_label)
+    await state.set_state(CalculatorState.PRICE)
     await call.answer()
+
+
+def _parse_price(raw: str) -> int | None:
+    """Парсит цену из строки, допускает любые пробелы, запятые и точки как разделители тысяч.
+
+    Возвращает целое число (единицы валюты) или None, если невалидно.
+    Ограничения: не пусто, неотрицательно, только цифры после очистки.
+    """
+    if raw is None:
+        return None
+    s = raw.strip()
+    if not s:
+        return None
+    # Удаляем все пробелы (в т.ч. множественные), запятые и точки
+    s = re.sub(r"[\s,\.]+", "", s)
+    if not s or not s.isdigit():
+        return None
+    try:
+        value = int(s)
+    except ValueError:
+        return None
+    if value < 0:
+        return None
+    return value
+
+
+def _format_amount(value: int) -> str:
+    """Форматирует число с пробелами в качестве разделителей тысяч."""
+    return f"{value:,}".replace(",", " ")
+
+
+@router.message(CalculatorState.PRICE, F.text)
+async def input_price(message: Message, state: FSMContext) -> None:
+    data = await state.get_data()
+    chat_id = data.get("prompt_chat_id")
+    msg_id = data.get("prompt_message_id")
+    vehicle_title = data.get("vehicle_title")
+    currency_title = data.get("currency_title")
+
+    value = _parse_price(message.text or "")
+    if value is None:
+        error_text = (
+            "Выбор сделан:\n"
+            f"— Тип авто: <b>{vehicle_title}</b>\n"
+            f"— Валюта: <b>{currency_title}</b>\n\n"
+            "Некорректное значение. Введите стоимость автомобиля (только число, можно с пробелами/запятыми/точками как разделителями тысяч):"
+        )
+        if chat_id and msg_id:
+            await message.bot.edit_message_text(chat_id=chat_id, message_id=msg_id, text=error_text)
+        else:
+            await message.answer(error_text)
+        return
+
+    # Валидно — сохраняем
+    await state.update_data(price=value)
+    amount_fmt = _format_amount(value)
+    summary_text = (
+        "Выбор сделан:\n"
+        f"— Тип авто: <b>{vehicle_title}</b>\n"
+        f"— Валюта: <b>{currency_title}</b>\n"
+        f"— Стоимость: <b>{amount_fmt}</b>\n\n"
+        "Следующий шаг мастера добавлю далее."
+    )
+    if chat_id and msg_id:
+        await message.bot.edit_message_text(chat_id=chat_id, message_id=msg_id, text=summary_text)
+    else:
+        await message.answer(summary_text)
+    # Здесь далее можно перевести в следующий стейт
