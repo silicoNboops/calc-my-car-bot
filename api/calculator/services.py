@@ -107,7 +107,11 @@ class CustomsCalculator:
             if g == AgeGroup.UNDER_3:
                 # процентные + минимум €/см³, брекеты по цене (EUR)
                 row = self._find_bracket(price_eur, rows, "max_value")
-                duty_from_price = price_eur * float(row.get("rate_percent", 0.0))
+                rate_percent = float(row.get("rate_percent", 0.0))
+                # В фикстурах ставка может храниться как 54 (т.е. 54%), нормализуем до 0.54
+                if rate_percent > 1.0:
+                    rate_percent = rate_percent / 100.0
+                duty_from_price = price_eur * rate_percent
                 duty_from_volume = engine_cc * float(row.get("min_rate_eur_cc", 0.0))
                 return max(duty_from_price, duty_from_volume)
             else:
@@ -130,7 +134,10 @@ class CustomsCalculator:
             # Два случая: процент (с минимумом €/см³) ИЛИ фикс €/см³
             if "rate_percent" in rows[0]:
                 row = self._find_bracket(engine_cc, rows, "max_cc")
-                duty_from_percent = price_eur * float(row.get("rate_percent", 0.0))
+                rate_percent = float(row.get("rate_percent", 0.0))
+                if rate_percent > 1.0:
+                    rate_percent = rate_percent / 100.0
+                duty_from_percent = price_eur * rate_percent
                 min_from_volume = engine_cc * float(row.get("min_rate_eur_cc", 0.0))
                 return max(duty_from_percent, min_from_volume)
             else:
