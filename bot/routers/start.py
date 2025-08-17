@@ -11,6 +11,12 @@ from bot.utils.fsm import reset_wizard
 from bot.keyboards.start import inline_start_menu_kb
 from bot.keyboards.calculator import vehicle_type_kb
 from bot.states import CalculatorState
+from bot.utils.strings import (
+    PROMPT_CHOOSE_VEHICLE_TYPE,
+    RESET_MESSAGE,
+    START_RATES_SOON,
+    START_LEAD_SOON,
+)
 
 if TYPE_CHECKING:
     from aiogram.types import Message, CallbackQuery
@@ -63,7 +69,7 @@ async def cb_start_calc(call: CallbackQuery, state: FSMContext) -> None:
     # Запуск визарда: устанавливаем состояние выбора типа ТС
     await state.set_state(CalculatorState.VEHICLE_TYPE)
     await call.message.answer(
-        "Выберите тип автомобиля:",
+        PROMPT_CHOOSE_VEHICLE_TYPE,
         reply_markup=vehicle_type_kb(),
     )
     await call.answer()
@@ -73,14 +79,14 @@ async def cb_start_calc(call: CallbackQuery, state: FSMContext) -> None:
 async def handle_cancel_command(message: Message, state: FSMContext) -> None:
     # Универсальная отмена визарда
     await reset_wizard(state)
-    await message.answer("Сбросил состояние. Можем начать заново: нажмите 'Калькулятор' или введите /calc")
+    await message.answer(RESET_MESSAGE)
 
 
 @router.callback_query(F.data == "start:rates")
 async def cb_start_rates(call: CallbackQuery) -> None:
-    await call.answer("Курсы валют скоро добавлю", show_alert=True)
+    await call.answer(START_RATES_SOON, show_alert=True)
 
 
 @router.callback_query(F.data == "start:lead")
 async def cb_start_lead(call: CallbackQuery) -> None:
-    await call.answer("Форму заявки скоро добавлю", show_alert=True)
+    await call.answer(START_LEAD_SOON, show_alert=True)
