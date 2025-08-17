@@ -25,7 +25,7 @@ async def choose_vehicle_type(call: CallbackQuery, state: FSMContext, callback_d
     veh_label = dict(VehicleType.choices).get(callback_data.type, callback_data.type)
     await call.message.edit_text(
         (
-            "1) Тип авто: <b>{veh}</b>\n\n"
+            "— Тип авто: <b>{veh}</b>\n\n"
             "Выберите, в какой валюте будет указана цена автомобиля:"
         ).format(veh=veh_label),
         reply_markup=currency_kb(),
