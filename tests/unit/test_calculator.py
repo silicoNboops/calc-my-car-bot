@@ -8,6 +8,7 @@ from rest_framework.test import APIClient
 
 from api.calculator.serializers import EstimateRequestSerializer
 from api.calculator.services import CalculatorService, CbrfCurrencyProvider, EstimateInput
+from api.config.currency import get_default_currency_provider
 from api.calculator.models import DutyRate, Audience, AgeGroup, DutyUnit, CustomsFee
 
 
@@ -251,8 +252,8 @@ def test_service_matches_endpoint_for_sample_case() -> None:
     assert resp.status_code == status.HTTP_200_OK, resp.content
     api_data = resp.json()
 
-    # Call service directly
-    svc = CalculatorService(CbrfCurrencyProvider())
+    # Call service directly (use the same provider factory as API to avoid mismatch)
+    svc = CalculatorService(get_default_currency_provider())
     calc = svc.build_calculator()
     res = calc.estimate(EstimateInput(**payload))
 
