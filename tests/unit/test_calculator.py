@@ -68,7 +68,9 @@ def test_boundary_phys_under3_price_bracket_duty_exact_max() -> None:
     min_rate_eur_cc = float(row.min_rate_eur_cc or 0.0)
 
     engine_cc = 1600
-    expected_duty = max(price_eur * rate_percent, engine_cc * min_rate_eur_cc)
+    # В фикстурах проценты могут храниться как 54 (т.е. 54%), нормализуем
+    rate_percent_norm = rate_percent / 100.0 if rate_percent > 1.0 else rate_percent
+    expected_duty = max(price_eur * rate_percent_norm, engine_cc * min_rate_eur_cc)
 
     client = APIClient()
     resp = client.post(
