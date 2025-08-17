@@ -210,7 +210,11 @@ class CustomsCalculator:
         util_fee = self._calc_util(is_commercial, data.age_key, int(data.engine_cc))
         accise_rub = self._calc_accise(int(data.hp), is_commercial)
         vat_rub = self._calc_vat(price_rub, duty_rub, accise_rub, is_commercial)
-        customs_fee = self._calc_customs_fee(price_rub)
+        # Таможенный сбор: для физлиц при личном использовании фиксировано 500 ₽ (v2)
+        if not is_commercial:
+            customs_fee = 500.0
+        else:
+            customs_fee = self._calc_customs_fee(price_rub)
 
         subtotal_customs = duty_rub + util_fee + accise_rub + vat_rub + customs_fee
 
