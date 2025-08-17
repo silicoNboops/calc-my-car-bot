@@ -2,12 +2,23 @@ from __future__ import annotations
 
 import pytest
 from django.urls import reverse
+from django.core.management import call_command
 from rest_framework import status
 from rest_framework.test import APIClient
 
 from api.calculator.serializers import EstimateRequestSerializer
 from api.calculator.services import CalculatorService, FixedCurrencyProvider, EstimateInput
 
+
+@pytest.fixture(autouse=True, scope="session")
+def _seed_customs_rates(django_db_setup, django_db_blocker):  # type: ignore[no-untyped-def]
+    """Загружаем ставки из JSON через management-команду для тестовой БД.
+
+    Используем seed_customs_rates с --replace чтобы гарантировать консистентные данные
+    для всех тестов этого модуля.
+    """
+    with django_db_blocker.unblock():
+        call_command("seed_customs_rates", "--replace", "--path", "api/calculator/fixtures")
 
 @pytest.mark.django_db()
 def test_serializer_age_key_forbidden_over5_for_jur() -> None:
