@@ -34,7 +34,11 @@ jobs:
       - name: Run linters
         run: make lint
 
-      - name: Run tests
+      - name: Run tests (SQLite in-memory, fixed currency provider)
+        env:
+          USE_TEST_DB: "1"
+          TEST_DATABASE_URL: "sqlite://:memory:"
+          USE_FIXED_CURRENCY_PROVIDER: "true"
         run: make test
 
   dependabot-auto-merge:
