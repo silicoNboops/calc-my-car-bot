@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import logging
 import requests
 from typing import Literal, Optional
 
 from django.core.cache import cache
 from django.db.models import QuerySet
+from django.conf import settings
+from dataclasses import dataclass
 
 from api.calculator.models import (
     AcciseRate,
@@ -279,8 +280,12 @@ class CbrfCurrencyProvider(CurrencyProvider):
     CBR_URL = "https://www.cbr-xml-daily.ru/daily_json.js"
     SUPPORTED = ("EUR", "USD", "CNY", "JPY", "KRW", "RUB")
 
-    def __init__(self, cache_timeout_seconds: int = 3600) -> None:
-        self.cache_timeout = cache_timeout_seconds
+    def __init__(self, cache_timeout_seconds: Optional[int] = None, url: Optional[str] = None) -> None:
+        # Настройки по умолчанию берём из Django settings, но можно переопределить аргументами
+        default_ttl = getattr(settings, "CBR_CACHE_TTL", 3600)
+        default_url = getattr(settings, "CBR_URL", self.CBR_URL)
+        self.cache_timeout = int(cache_timeout_seconds if cache_timeout_seconds is not None else default_ttl)
+        self.url = str(url or default_url)
         self.logger = logging.getLogger(__name__)
 
     def get_rates(self) -> dict[str, float]:
@@ -290,7 +295,7 @@ class CbrfCurrencyProvider(CurrencyProvider):
             return cached
 
         try:
-            resp = requests.get(self.CBR_URL, timeout=10)
+            resp = requests.get(self.url, timeout=10)
             resp.raise_for_status()
             data = resp.json()
 
