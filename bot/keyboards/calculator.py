@@ -4,7 +4,7 @@ from aiogram.filters.callback_data import CallbackData
 from aiogram.types import InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from api.calculator.choices import VehicleType, Currency, ImporterKind, EngineType
+from api.calculator.choices import VehicleType, Currency, ImporterKind, EngineType, AgeKey
 
 # Человекочитаемые названия валют для отображения в кнопках
 _CURRENCY_TITLES_RU: dict[str, str] = {
@@ -138,4 +138,34 @@ def engine_type_kb() -> InlineKeyboardMarkup:
 def format_engine_type_title(kind: str) -> str:
     title = dict(EngineType.choices).get(kind, kind)
     emoji = _ENGINE_EMOJI.get(kind, "")
+    return f"{emoji} {title}".strip()
+
+
+# AGE KEY
+class AgeKeyCD(CallbackData, prefix="age"):
+    key: str  # values from AgeKey choices
+
+
+_AGE_EMOJI: dict[str, str] = {
+    AgeKey.UNDER_3: "🟢",
+    AgeKey.FROM_3_TO_5: "🟡",
+    AgeKey.FROM_5_TO_7: "🟠",
+    AgeKey.OVER_7: "🔴",
+    AgeKey.OVER_5: "🔴",
+}
+
+
+def age_key_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    for key, title in AgeKey.choices:
+        emoji = _AGE_EMOJI.get(key, "")
+        text = f"{emoji} {title}".strip()
+        builder.button(text=text, callback_data=AgeKeyCD(key=key).pack())
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def format_age_key_title(key: str) -> str:
+    title = dict(AgeKey.choices).get(key, key)
+    emoji = _AGE_EMOJI.get(key, "")
     return f"{emoji} {title}".strip()

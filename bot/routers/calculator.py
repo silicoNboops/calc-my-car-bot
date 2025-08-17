@@ -19,6 +19,9 @@ from bot.keyboards.calculator import (
     EngineTypeCD,
     engine_type_kb,
     format_engine_type_title,
+    AgeKeyCD,
+    age_key_kb,
+    format_age_key_title,
 )
 from bot.states import CalculatorState
 
@@ -291,6 +294,42 @@ async def input_engine_cc(message: Message, state: FSMContext) -> None:
         "Следующий шаг мастера добавлю далее."
     )
     if chat_id and msg_id:
-        await message.bot.edit_message_text(chat_id=chat_id, message_id=msg_id, text=summary_text)
+        # После ввода объёма предлагаем выбрать возраст авто
+        prompt_text = (
+            summary_text + "\nВыберите возраст автомобиля:"
+        )
+        await message.bot.edit_message_text(chat_id=chat_id, message_id=msg_id, text=prompt_text, reply_markup=age_key_kb())
     else:
         await message.answer(summary_text)
+        await message.answer("Выберите возраст автомобиля:", reply_markup=age_key_kb())
+    await state.set_state(CalculatorState.AGE_KEY)
+
+
+@router.callback_query(CalculatorState.AGE_KEY, AgeKeyCD.filter())
+async def choose_age_key(call: CallbackQuery, state: FSMContext, callback_data: AgeKeyCD) -> None:
+    await state.update_data(age_key=callback_data.key)
+    data = await state.get_data()
+    vehicle_title = data.get("vehicle_title") or format_vehicle_title(str(data.get("vehicle_type", "")))
+    currency_title = data.get("currency_title") or format_currency_title(str(data.get("currency", "")))
+    price = int(data.get("price", 0))
+    amount_fmt = _format_amount(price)
+    importer_title = format_importer_kind_title(str(data.get("importer_kind", "")))
+    engine_title = format_engine_type_title(str(data.get("engine_type", "")))
+    engine_cc = int(data.get("engine_cc", 0))
+    engine_cc_fmt = f"{_format_amount(engine_cc)} см³" if engine_cc else "—"
+    age_title = format_age_key_title(callback_data.key)
+    await call.message.edit_text(
+        (
+            "Выбор сделан:\n"
+            f"— Тип авто: <b>{vehicle_title}</b>\n"
+            f"— Валюта: <b>{currency_title}</b>\n"
+            f"— Стоимость: <b>💰 {amount_fmt}</b>\n"
+            f"— Кто ввозит: <b>{importer_title}</b>\n"
+            f"— Тип двигателя: <b>{engine_title}</b>\n"
+            f"— Объём: <b>🧱 {engine_cc_fmt}</b>\n"
+            f"— Возраст: <b>{age_title}</b>\n\n"
+            "Следующий шаг мастера добавлю далее."
+        ),
+        reply_markup=None,
+    )
+    await call.answer()
