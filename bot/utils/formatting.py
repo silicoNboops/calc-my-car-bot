@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Optional
+import re
 
 from bot.keyboards.calculator import (
     format_age_key_title,  # kept for potential future use
@@ -37,6 +38,7 @@ def format_selection_header(data: dict, *, age_title: Optional[str] = None) -> s
     - importer_kind
     - engine_type
     - engine_cc (int)
+    - hp (int)
     - age_title (через аргумент)
     """
     lines: list[str] = ["Выбор сделан:"]
@@ -82,7 +84,50 @@ def format_selection_header(data: dict, *, age_title: Optional[str] = None) -> s
         except Exception:
             pass
 
+    hp = data.get("hp")
+    if hp:
+        try:
+            lines.append(f"— Мощность: <b>⚙️ {format_amount(int(hp))} л.с.</b>")
+        except Exception:
+            pass
+
     if age_title:
         lines.append(f"— Возраст: <b>{age_title}</b>")
 
     return "\n".join(lines) + "\n\n"
+
+
+def parse_int_amount(raw: Optional[str]) -> Optional[int]:
+    """Парсит положительное целое из строки, допускает пробелы/запятые/точки как разделители тысяч.
+
+    Возвращает None, если пусто/некорректно/<=0.
+    """
+    if raw is None:
+        return None
+    s = raw.strip()
+    if not s:
+        return None
+    cleaned = re.sub(r"[\s,\.]+", "", s)
+    if not cleaned.isdigit():
+        return None
+    try:
+        value = int(cleaned)
+    except Exception:
+        return None
+    if value <= 0:
+        return None
+    return value
+
+
+def build_number_error(raw: str, *, what: str) -> str:
+    """Строит текст ошибки валидации для числового ввода.
+
+    what — человекочитаемое название поля (например, 'стоимость', 'объём двигателя').
+    """
+    s = (raw or "").strip()
+    if not s:
+        return "Ошибка: значение пустое."
+    cleaned = re.sub(r"[\s,\.]+", "", s)
+    if not cleaned.isdigit():
+        return "Ошибка: введите целое число, можно с пробелами/запятыми/точками как разделителями тысяч."
+    return f"Ошибка: {what} должна быть > 0."
