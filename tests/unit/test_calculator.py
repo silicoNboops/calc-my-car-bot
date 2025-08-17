@@ -159,6 +159,62 @@ def test_boundary_customs_fee_exact_max_value_rub() -> None:
 
 
 @pytest.mark.django_db()
+def test_ev_phys_under3_basic_v2_rules() -> None:
+    """Физлицо, электро, <3 лет: duty = 15% от цены (EUR), accise=0, VAT=0, util=3400, customs_fee=500."""
+    client = APIClient()
+    payload = {
+        "price": 20000.0,  # EUR
+        "currency": "EUR",
+        "engine_cc": 1,  # не влияет на EV <3 в наших правилах
+        "hp": 150,
+        "engine_type": "Электро",
+        "age_key": "under_3",
+        "is_jur": False,
+        "is_personal_use": True,
+    }
+    resp = client.post(reverse("calculator:estimate"), data=payload, format="json")
+    assert resp.status_code == status.HTTP_200_OK, resp.content
+    data = resp.json()
+    # duty_eur = 15% от 20000 = 3000
+    assert pytest.approx(data["duty_eur"], rel=1e-6) == 3000.0
+    # util_fee = 20_000 * 0.17 = 3400
+    assert pytest.approx(data["util_fee"], rel=1e-6) == 3400.0
+    # accise и VAT = 0 для физ личного использования
+    assert data["accise_rub"] == 0.0
+    assert data["vat_rub"] == 0.0
+    # customs_fee = 500
+    assert data["customs_fee"] == 500.0
+
+
+@pytest.mark.django_db()
+def test_hybrid_parallel_jur_over5_min_rule() -> None:
+    """Юрлицо, гибрид(паралл), 5-7 лет: duty = max(0.18*price, 1.20*cc)."""
+    client = APIClient()
+    payload = {
+        "price": 10000.0,  # EUR
+        "currency": "EUR",
+        "engine_cc": 1800,
+        "hp": 120,
+        "engine_type": "Гибрид(паралл)",
+        "age_key": "5_to_7",
+        "is_jur": True,
+        "is_personal_use": False,
+        "dvs_hp": 80,  # для акциза используем ДВС часть; попадает в 0-90 (ставка 0)
+    }
+    resp = client.post(reverse("calculator:estimate"), data=payload, format="json")
+    assert resp.status_code == status.HTTP_200_OK, resp.content
+    data = resp.json()
+    # duty_eur = max(0.18*10000, 1.20*1800) = max(1800, 2160) = 2160
+    assert pytest.approx(data["duty_eur"], rel=1e-6) == 2160.0
+    # util_fee коммерческий гибрид старше 3 лет: 20_000 * 2.84 = 56800
+    assert pytest.approx(data["util_fee"], rel=1e-6) == 56800.0
+    # accise по hp=dvs_hp=80 в первой ступени (0 руб/лс) -> 0
+    assert data["accise_rub"] == 0.0
+    # Для юрлиц VAT > 0
+    assert data["vat_rub"] > 0.0
+
+
+@pytest.mark.django_db()
 @pytest.mark.parametrize("case", [
     {
         "title": "Физ <3 лет бензин 1999см³ 150лс 20k EUR",
