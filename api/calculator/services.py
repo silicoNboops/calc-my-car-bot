@@ -154,8 +154,8 @@ class CustomsCalculator:
                 return engine_cc * float(row.get("rate_eur_cc", 0.0))
 
     def _calc_util(self, is_commercial: bool, age_key: str, engine_cc: int) -> float:
-        # TODO: перенести util_base в БД/Settings. Сейчас используется fallback 20000 как в legacy.
-        util_base = 20000.0
+        # util_base хранится в Settings (fallback к 20000.0 при отсутствии)
+        util_base = float(getattr(self.settings, "util_base", 20000.0) or 20000.0)
         if not is_commercial:
             row = self.util_fees.filter(kind="personal_new").first() if age_key == "under_3" else self.util_fees.filter(kind="personal_old").first()
             coeff = float(getattr(row, "coeff", 0.0))

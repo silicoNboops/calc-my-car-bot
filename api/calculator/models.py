@@ -118,6 +118,7 @@ class CustomsFee(models.Model):
 class Settings(models.Model):
     vat_rate = models.FloatField(default=0.20)
     company_commission_rub = models.FloatField(default=69000.0)
+    util_base = models.FloatField(default=20000.0)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
