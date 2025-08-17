@@ -14,8 +14,11 @@ class VehicleTypeCD(CallbackData, prefix="veh"):
 
 def vehicle_type_kb() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
+    # Идентификаторы строго соответствуют VehicleType в api.calculator.services:
+    # ["car", "quad", "snowmobile", "motorcycle"]
     builder.button(text="Легковой", callback_data=VehicleTypeCD(type="car").pack())
     builder.button(text="Снегоход", callback_data=VehicleTypeCD(type="snowmobile").pack())
-    builder.button(text="Квадроцикл", callback_data=VehicleTypeCD(type="atv").pack())
+    builder.button(text="Квадроцикл", callback_data=VehicleTypeCD(type="quad").pack())
+    builder.button(text="Мотоцикл", callback_data=VehicleTypeCD(type="motorcycle").pack())
     builder.adjust(1)
     return builder.as_markup()
