@@ -4,49 +4,19 @@ from typing import TYPE_CHECKING
 
 from aiogram import Router
 from aiogram.filters import Command
-
-from api.user.models import User
+from aiogram.fsm.context import FSMContext
 from asgiref.sync import sync_to_async
+
 from api.calculator.services import (
     CalculatorService,
-    get_default_currency_provider,
     EstimateInput,
+    get_default_currency_provider,
 )
 
 if TYPE_CHECKING:
     from aiogram.types import Message
 
 router = Router()
-
-
-@router.message(Command(commands=["start"]))
-async def handle_start_command(message: Message) -> None:
-    if message.from_user is None:
-        return
-
-    _, is_new = await User.objects.aget_or_create(
-        pk=message.from_user.id,
-        defaults={
-            "username": message.from_user.username,
-            "first_name": message.from_user.first_name,
-            "last_name": message.from_user.last_name,
-        },
-    )
-
-    if is_new:
-        await message.answer("You have successfully registered in the bot!")
-    else:
-        await message.answer("You are already registered in the bot!")
-
-
-@router.message(Command(commands=["id"]))
-async def handle_id_command(message: Message) -> None:
-    if message.from_user is None:
-        return
-
-    await message.answer(
-        f"User Id: <b>{message.from_user.id}</b>\nChat Id: <b>{message.chat.id}</b>",
-    )
 
 
 def _parse_calc_args(text: str) -> dict | str:
@@ -115,7 +85,7 @@ def _format_result(res) -> str:  # type: ignore[no-untyped-def]
     )
 
 
-def _estimate_sync(payload: dict) -> dict:
+def _estimate_sync(payload: dict) -> str:
     """Синхронная часть: берёт ORM-данные и считает результат."""
     service = CalculatorService(currency_provider=get_default_currency_provider())
     calc = service.build_calculator()
@@ -124,9 +94,13 @@ def _estimate_sync(payload: dict) -> dict:
 
 
 @router.message(Command(commands=["calc"]))
-async def handle_calc_command(message: Message) -> None:
+async def handle_calc_command(message: Message, state: FSMContext) -> None:
+    # Сброс состояния визарда при вызове /calc
+    await state.clear()
     if message.text is None:
-        await message.answer("Сообщение пустое. Пример: /calc 20000 EUR 1999 150 Бензин under_3 phys personal")
+        await message.answer(
+            "Сообщение пустое. Пример: /calc 20000 EUR 1999 150 Бензин under_3 phys personal"
+        )
         return
 
     parsed = _parse_calc_args(message.text)
@@ -135,7 +109,6 @@ async def handle_calc_command(message: Message) -> None:
         return
 
     try:
-        # Важно: доступ к ORM обёрнут через sync_to_async
         result_text = await sync_to_async(_estimate_sync)(parsed)
         await message.answer(result_text)
     except Exception as e:  # noqa: BLE001

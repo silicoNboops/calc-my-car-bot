@@ -7,10 +7,11 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.types import BotCommand
+from aiogram.fsm.storage.memory import MemoryStorage
 
 from api.config.logging import LOGGING
 from bot.config.bot import RUNNING_MODE, TELEGRAM_API_TOKEN, RunningMode
-from bot.handlers import router
+from bot.routers import router
 
 logging.config.dictConfig(LOGGING)
 logger = logging.getLogger(__name__)
@@ -22,7 +23,7 @@ bot = Bot(
     )
 )
 
-dispatcher = Dispatcher()
+dispatcher = Dispatcher(storage=MemoryStorage())
 dispatcher.include_router(router)
 
 
