@@ -86,9 +86,9 @@ class RoleCD(CallbackData, prefix="role"):
 
 
 # Базовые подписи берём из ImporterKind.choices, переопределять не нужно
-_ROLE_TITLES: dict[str, str] = dict(ImporterKind.choices)
+_IMPORTER_KIND_TITLES: dict[str, str] = dict(ImporterKind.choices)
 
-_ROLE_EMOJI: dict[str, str] = {
+_IMPORTER_KIND_EMOJI: dict[str, str] = {
     "jur": "🏢",
     "phys_personal": "👤",
     "phys_commercial": "🛒",
@@ -98,7 +98,7 @@ _ROLE_EMOJI: dict[str, str] = {
 def role_kb() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     for kind, title in ImporterKind.choices:
-        emoji = _ROLE_EMOJI.get(kind, "")
+        emoji = _IMPORTER_KIND_EMOJI.get(kind, "")
         text = f"{emoji} {title}".strip()
         builder.button(text=text, callback_data=RoleCD(kind=kind).pack())
     builder.adjust(1)
@@ -106,8 +106,8 @@ def role_kb() -> InlineKeyboardMarkup:
 
 
 def format_importer_kind_title(kind: str) -> str:
-    title = _ROLE_TITLES.get(kind, dict(ImporterKind.choices).get(kind, kind))
-    emoji = _ROLE_EMOJI.get(kind, "")
+    title = _IMPORTER_KIND_TITLES.get(kind, dict(ImporterKind.choices).get(kind, kind))
+    emoji = _IMPORTER_KIND_EMOJI.get(kind, "")
     return f"{emoji} {title}".strip()
 
 
