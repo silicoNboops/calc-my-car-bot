@@ -57,5 +57,13 @@ ruff-fmt:
 test:
 	python -m pytest
 
+# Run tests with in-memory SQLite (no Postgres required)
+test-sqlite:
+	USE_TEST_DB=1 TEST_DATABASE_URL=sqlite://:memory: python -m pytest -q
+
+# Same as test-sqlite but with coverage thresholds from pyproject
+test-sqlite-cov:
+	USE_TEST_DB=1 TEST_DATABASE_URL=sqlite://:memory: python -m pytest
+
 mypy:
 	python -m mypy .
