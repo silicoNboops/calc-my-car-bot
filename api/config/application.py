@@ -22,6 +22,7 @@ INSTALLED_APPS = [
     "silk",
     "rest_framework",
     "drf_spectacular",
+    "api.calculator.apps.CalculatorConfig",
     "api.user.apps.UserConfig",
 ]
 

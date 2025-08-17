@@ -1,0 +1,36 @@
+{
+  "settings": {
+    "vat_rate": 0.2,
+    "company_commission_rub": 69000
+  },
+  "duty_rates": [
+    {
+      "audience": "PASSENGER_CAR_PHYS",
+      "age_group": "under_3_years",
+      "unit": "percent",
+      "max_value": 8500,
+      "rate_percent": 54,
+      "rate_eur_cc": null,
+      "min_rate_eur_cc": 2.5
+    }
+  ],
+  "util_fees": [
+    {
+      "kind": "personal_new",
+      "max_cc": 1000,
+      "coeff": 0.86
+    }
+  ],
+  "accise_rates": [
+    {
+      "max_hp": 90,
+      "rate_rub_per_hp": 0
+    }
+  ],
+  "customs_fees": [
+    {
+      "max_value_rub": 200000,
+      "fee_rub": 775
+    }
+  ]
+}
