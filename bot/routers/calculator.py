@@ -1,8 +1,7 @@
- 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
 import re
+from typing import TYPE_CHECKING
 
 from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
@@ -15,7 +14,6 @@ from bot.keyboards.calculator import (
     format_currency_title,
 )
 from bot.states import CalculatorState
-from api.calculator.choices import VehicleType
 
 if TYPE_CHECKING:
     from aiogram.types import CallbackQuery, Message
@@ -58,7 +56,8 @@ async def choose_currency(call: CallbackQuery, state: FSMContext, callback_data:
         reply_markup=None,
     )
     # Переходим к вводу стоимости и запоминаем id сообщения с промптом
-    await state.update_data(prompt_chat_id=msg.chat.id, prompt_message_id=msg.message_id, vehicle_title=vehicle_type, currency_title=currency_label)
+    await state.update_data(prompt_chat_id=msg.chat.id, prompt_message_id=msg.message_id, vehicle_title=vehicle_type,
+                            currency_title=currency_label)
     await state.set_state(CalculatorState.PRICE)
     await call.answer()
 
