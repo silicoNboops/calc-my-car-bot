@@ -16,6 +16,3 @@ class CalculatorState(StatesGroup):
     ENGINE_TYPE = State()
     ENGINE_CC = State()
     AGE_KEY = State()
-    # TODO: HP = State()
-    # TODO: USAGE = State()
-    # TODO: PREVIEW = State()

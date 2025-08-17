@@ -7,6 +7,7 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 
 from api.user.models import User
+from bot.utils.fsm import reset_wizard
 from bot.keyboards.start import inline_start_menu_kb
 from bot.keyboards.calculator import vehicle_type_kb
 from bot.states import CalculatorState
@@ -23,7 +24,7 @@ async def handle_start_command(message: Message, state: FSMContext) -> None:
         return
 
     # Сброс состояния визарда при входе в /start
-    await state.clear()
+    await reset_wizard(state)
 
     _, is_new = await User.objects.aget_or_create(
         pk=message.from_user.id,
@@ -47,7 +48,7 @@ async def handle_id_command(message: Message, state: FSMContext) -> None:
         return
 
     # Сброс состояния визарда при запросе /id
-    await state.clear()
+    await reset_wizard(state)
 
     await message.answer(
         f"User Id: <b>{message.from_user.id}</b>\nChat Id: <b>{message.chat.id}</b>",
@@ -57,6 +58,8 @@ async def handle_id_command(message: Message, state: FSMContext) -> None:
 # Inline-кнопки стартового меню (заглушки)
 @router.callback_query(F.data == "start:calc")
 async def cb_start_calc(call: CallbackQuery, state: FSMContext) -> None:
+    # Перед запуском — сброс существующего состояния
+    await reset_wizard(state)
     # Запуск визарда: устанавливаем состояние выбора типа ТС
     await state.set_state(CalculatorState.VEHICLE_TYPE)
     await call.message.answer(
@@ -64,6 +67,13 @@ async def cb_start_calc(call: CallbackQuery, state: FSMContext) -> None:
         reply_markup=vehicle_type_kb(),
     )
     await call.answer()
+
+
+@router.message(Command(commands=["cancel"]))
+async def handle_cancel_command(message: Message, state: FSMContext) -> None:
+    # Универсальная отмена визарда
+    await reset_wizard(state)
+    await message.answer("Сбросил состояние. Можем начать заново: нажмите 'Калькулятор' или введите /calc")
 
 
 @router.callback_query(F.data == "start:rates")
