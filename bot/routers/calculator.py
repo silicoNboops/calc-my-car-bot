@@ -7,6 +7,7 @@ from aiogram.fsm.context import FSMContext
 
 from bot.keyboards.calculator import VehicleTypeCD, CurrencyCD, currency_kb
 from bot.states import CalculatorState
+from api.calculator.choices import VehicleType
 
 if TYPE_CHECKING:
     from aiogram.types import CallbackQuery
@@ -21,8 +22,12 @@ async def choose_vehicle_type(call: CallbackQuery, state: FSMContext, callback_d
     # 2) Переходим к следующему шагу — выбор валюты
     await state.set_state(CalculatorState.CURRENCY)
     # 3) Редактируем текущее сообщение (не создаём новое), показываем клавиатуру валют
+    veh_label = dict(VehicleType.choices).get(callback_data.type, callback_data.type)
     await call.message.edit_text(
-        "Выберите, в какой валюте будет указана цена автомобиля:",
+        (
+            "1) Тип авто: <b>{veh}</b>\n\n"
+            "Выберите, в какой валюте будет указана цена автомобиля:"
+        ).format(veh=veh_label),
         reply_markup=currency_kb(),
     )
     await call.answer()

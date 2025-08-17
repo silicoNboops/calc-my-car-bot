@@ -16,6 +16,24 @@ _CURRENCY_TITLES_RU: dict[str, str] = {
     "RUB": "Рубль",
 }
 
+# Эмодзи для валют (флаги). Используем перед текстом для лучшей читаемости
+_CURRENCY_FLAGS: dict[str, str] = {
+    "CNY": "🇨🇳",
+    "JPY": "🇯🇵",
+    "KRW": "🇰🇷",
+    "USD": "🇺🇸",
+    "EUR": "🇪🇺",
+    "RUB": "🇷🇺",
+}
+
+# Эмодзи для видов ТС (только в клавиатурах)
+_VEHICLE_EMOJI: dict[str, str] = {
+    VehicleType.CAR.value: "🚗",
+    VehicleType.SNOWMOBILE.value: "🛷",
+    VehicleType.QUAD.value: "🛞",
+    VehicleType.MOTORCYCLE.value: "🏍️",
+}
+
 
 class VehicleTypeCD(CallbackData, prefix="veh"):
     type: str
@@ -26,7 +44,9 @@ def vehicle_type_kb() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     # Строим кнопки из единого источника истины — Django TextChoices
     for value, label in VehicleType.choices:
-        builder.button(text=str(label), callback_data=VehicleTypeCD(type=str(value)).pack())
+        emoji = _VEHICLE_EMOJI.get(str(value), "")
+        text = f"{emoji} {label}".strip()
+        builder.button(text=text, callback_data=VehicleTypeCD(type=str(value)).pack())
     builder.adjust(1)
     return builder.as_markup()
 
@@ -38,7 +58,10 @@ class CurrencyCD(CallbackData, prefix="cur"):
 def currency_kb() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     for value, label in Currency.choices:
-        title = _CURRENCY_TITLES_RU.get(str(value), str(label))
-        builder.button(text=title, callback_data=CurrencyCD(code=str(value)).pack())
+        code = str(value)
+        title = _CURRENCY_TITLES_RU.get(code, str(label))
+        flag = _CURRENCY_FLAGS.get(code, "")
+        text = f"{flag} {title}".strip()
+        builder.button(text=text, callback_data=CurrencyCD(code=code).pack())
     builder.adjust(1)
     return builder.as_markup()
