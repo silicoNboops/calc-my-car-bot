@@ -7,7 +7,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from api.calculator.serializers import EstimateRequestSerializer
-from api.calculator.services import CalculatorService, FixedCurrencyProvider, EstimateInput
+from api.calculator.services import CalculatorService, CbrfCurrencyProvider, EstimateInput
 from api.calculator.models import DutyRate, Audience, AgeGroup, DutyUnit, CustomsFee
 
 
@@ -252,7 +252,7 @@ def test_service_matches_endpoint_for_sample_case() -> None:
     api_data = resp.json()
 
     # Call service directly
-    svc = CalculatorService(FixedCurrencyProvider())
+    svc = CalculatorService(CbrfCurrencyProvider())
     calc = svc.build_calculator()
     res = calc.estimate(EstimateInput(**payload))
 
