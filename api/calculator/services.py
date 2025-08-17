@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import logging
+import requests
 from typing import Literal, Optional
 
-# from django.core.cache import cache
+from django.core.cache import cache
 from django.db.models import QuerySet
 
 from api.calculator.models import (
@@ -239,13 +241,14 @@ class CalculatorService:
             "accise": AcciseRate.objects.all(),
             "customs_fee": CustomsFee.objects.all(),
         }
-        return CustomsCalculator(rates=rates, settings=settings, currency_rates=currency_rates)
+        calculator = CustomsCalculator(rates, settings, currency_rates)
+        return calculator
 
 
 class FixedCurrencyProvider(CurrencyProvider):
     """Временный провайдер курсов валют: фиксированные значения.
 
-    Значения соответствуют legacy: словарь хранит RUB за единицу валюты
+{{ ... }}
     (RUB=1.0, EUR≈100 и т.д.).
 
     TODO: заменить на реальный провайдер курсов (ЦБ РФ) с кэшированием.
@@ -263,3 +266,52 @@ class FixedCurrencyProvider(CurrencyProvider):
 
     def get_rates(self) -> dict[str, float]:
         return dict(self._rates)
+
+
+class CbrfCurrencyProvider(CurrencyProvider):
+    """Провайдер курсов ЦБ РФ с кэшированием.
+
+    - Источник: https://www.cbr-xml-daily.ru/daily_json.js
+    - Кэш через Django cache, ключ фиксирован, TTL настраиваемый.
+    - Fallback: возвращаем фиксированные курсы из FixedCurrencyProvider при ошибке.
+    """
+
+    CBR_URL = "https://www.cbr-xml-daily.ru/daily_json.js"
+    SUPPORTED = ("EUR", "USD", "CNY", "JPY", "KRW", "RUB")
+
+    def __init__(self, cache_timeout_seconds: int = 3600) -> None:
+        self.cache_timeout = cache_timeout_seconds
+        self.logger = logging.getLogger(__name__)
+
+    def get_rates(self) -> dict[str, float]:
+        cache_key = "currency_rates_cbrf_v1"
+        cached = cache.get(cache_key)
+        if isinstance(cached, dict) and cached:
+            return cached
+
+        try:
+            resp = requests.get(self.CBR_URL, timeout=10)
+            resp.raise_for_status()
+            data = resp.json()
+
+            rates: dict[str, float] = {"RUB": 1.0}
+            valute = data.get("Valute", {}) or {}
+            for code in self.SUPPORTED:
+                if code == "RUB":
+                    continue
+                v = valute.get(code)
+                if not v:
+                    continue
+                value = float(v.get("Value", 0.0))
+                nominal = float(v.get("Nominal", 1.0)) or 1.0
+                rates[code] = value / nominal
+
+            # Если по какой-то причине не получили EUR, считаем это ошибкой источника
+            if "EUR" not in rates:
+                raise ValueError("EUR rate is missing from CBR response")
+
+            cache.set(cache_key, rates, timeout=self.cache_timeout)
+            return rates
+        except Exception as e:  # noqa: BLE001
+            self.logger.warning("CBRF rates fetch failed, fallback to fixed: %s", e)
+            return FixedCurrencyProvider().get_rates()
