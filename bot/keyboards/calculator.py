@@ -1,14 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 from aiogram.filters.callback_data import CallbackData
 from aiogram.types import InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from api.calculator.choices import VehicleType
 
 
-@dataclass
 class VehicleTypeCD(CallbackData, prefix="veh"):
     type: str
 
