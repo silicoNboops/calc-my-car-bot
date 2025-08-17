@@ -51,7 +51,7 @@ async def choose_currency(call: CallbackQuery, state: FSMContext, callback_data:
             "Выбор сделан:\n"
             f"— Тип авто: <b>{vehicle_type}</b>\n"
             f"— Валюта: <b>{currency_label}</b>\n\n"
-            "Введите стоимость автомобиля (например, 1 200 000):"
+            "Введите стоимость автомобиля (например, 💰 1 200 000):"
         ),
         reply_markup=None,
     )
@@ -123,7 +123,7 @@ async def input_price(message: Message, state: FSMContext) -> None:
             "Выбор сделан:\n"
             f"— Тип авто: <b>{vehicle_title}</b>\n"
             f"— Валюта: <b>{currency_title}</b>\n"
-            f"— Стоимость: <b>ОШИБКА</b>\n\n"
+            f"— Стоимость: <b>💰 ОШИБКА</b>\n\n"
             f"{reason}"
         )
         if chat_id and msg_id:
@@ -139,7 +139,7 @@ async def input_price(message: Message, state: FSMContext) -> None:
         "Выбор сделан:\n"
         f"— Тип авто: <b>{vehicle_title}</b>\n"
         f"— Валюта: <b>{currency_title}</b>\n"
-        f"— Стоимость: <b>{amount_fmt}</b>\n\n"
+        f"— Стоимость: <b>💰 {amount_fmt}</b>\n\n"
         "Следующий шаг мастера добавлю далее."
     )
     if chat_id and msg_id:
