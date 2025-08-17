@@ -13,15 +13,15 @@ CLI‑утилита для расчёта растаможки легковых
 pip3 install -r requirements.txt
 ```
 
-2) Запустите калькулятор:
+2) Запустите калькулятор (v1, legacy CLI):
 ```
-python3 main.py
+python3 customs_calculator_v1.py
 ```
 
 3) Опционально, можно переинициализировать БД дефолтами из меню (п.2) или обновить ставки (заглушка, п.3).
 
 ## Файлы
-- `main.py` — CLI, классы `RatesFetcher`, `RatesStore`, `CustomsCalculator`.
+- `customs_calculator_v1.py` — CLI, классы `RatesFetcher`, `RatesStore`, `CustomsCalculator` (бывш. `main.py`).
 - `rates_updater.py` — заглушка обновления ставок (место для парсинга оф. источников).
 - `trans.html` — справочные таблицы ставок.
 - `customs_rates.db` — БД ставок (создаётся автоматически).
