@@ -81,7 +81,8 @@ def _parse_price(raw: str) -> int | None:
         value = int(s)
     except ValueError:
         return None
-    if value < 0:
+    # Требование: строго > 0
+    if value <= 0:
         return None
     return value
 
@@ -100,17 +101,35 @@ async def input_price(message: Message, state: FSMContext) -> None:
     currency_title = data.get("currency_title")
 
     value = _parse_price(message.text or "")
+    # Пытаемся удалить пользовательское сообщение (эстетика чата)
+    try:
+        await message.delete()
+    except Exception:
+        pass
     if value is None:
-        error_text = (
+        # Определяем пояснение ошибки
+        raw = (message.text or "").strip()
+        if not raw:
+            reason = "Ошибка: значение пустое."
+        else:
+            # Если после очистки не цифры — это не число; либо число <= 0
+            cleaned = re.sub(r"[\s,\.]+", "", raw)
+            if not cleaned.isdigit():
+                reason = "Ошибка: введите целое число, можно с пробелами/запятыми/точками как разделителями тысяч."
+            else:
+                reason = "Ошибка: стоимость должна быть > 0."
+
+        error_summary = (
             "Выбор сделан:\n"
             f"— Тип авто: <b>{vehicle_title}</b>\n"
-            f"— Валюта: <b>{currency_title}</b>\n\n"
-            "Некорректное значение. Введите стоимость автомобиля (только число, можно с пробелами/запятыми/точками как разделителями тысяч):"
+            f"— Валюта: <b>{currency_title}</b>\n"
+            f"— Стоимость: <b>ОШИБКА</b>\n\n"
+            f"{reason}"
         )
         if chat_id and msg_id:
-            await message.bot.edit_message_text(chat_id=chat_id, message_id=msg_id, text=error_text)
+            await message.bot.edit_message_text(chat_id=chat_id, message_id=msg_id, text=error_summary)
         else:
-            await message.answer(error_text)
+            await message.answer(error_summary)
         return
 
     # Валидно — сохраняем
