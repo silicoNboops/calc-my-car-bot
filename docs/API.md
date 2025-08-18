@@ -28,6 +28,18 @@
 - [Сопоставление v3 → API](V3_TO_API_MAPPING.md)
 - [Отличия v4 → API (дельта к v3)](V4_TO_API_MAPPING.md)
 
+#### V4 non-car (quad/snowmobile/motorcycle)
+
+- Новые единицы ставок пошлины в `DutyRate.unit`:
+  - `EUR_HP` — фикс €/л.с. (используется для ФЛ старше 3 лет по quad/snowmobile и для ряда кейсов у ЮЛ по возрастным группам).
+  - `PERCENT_HP` — процент от цены с минимальным €/л.с. (используется для ФЛ младше 3 лет по quad/snowmobile и для ЮЛ в отдельных возрастных группах).
+- Аудитории (частичные примеры): `QUAD_PHYS|JUR`, `SNOWMOBILE_PHYS|JUR`, `MOTORCYCLE_PHYS|JUR`.
+- Возрастные группы: `under_3_years`, `3_to_5_years`, `over_5_years` (для non-car тестов используются under_3/over_5).
+- Расчёт в сервисе (`CustomsCalculator`):
+  - Для `PERCENT_HP`: берётся `max(price_eur * rate_percent, hp * min_rate_eur_hp)`.
+  - Для `EUR_HP`: берётся `hp * rate_eur_hp`.
+  - Для мотоциклов сохраняются cc-правила (`PERCENT`/`EUR_CC`) по V4 фикстурам.
+
 ### Провайдер валют
 
 Провайдер валют выбирается фабрикой `get_default_currency_provider()` (см. `api/calculator/services.py`). Конфигурация:
