@@ -90,7 +90,7 @@ def _seed_customs_rates(django_db_setup, django_db_blocker):
         call_command("seed_customs_rates", "--replace", "--path", "api/calculator/fixtures")
 ```
 
-Это локально к модулю тестов и не влияет на остальные тесты. JSON-фикстуры лежат в `api/calculator/fixtures/`.
+Это локально к модулю тестов и не влияет на остальные тесты. JSON-фикстуры лежат в `api/calculator/fixtures/`. Аналогичная автозагрузочная фикстура добавлена в `tests/unit/test_v4_non_car_duty.py` для ставок V4 не‑авто (quad/snowmobile/motorcycle).
 
 ## Тесты провайдера курсов ЦБ РФ
 
