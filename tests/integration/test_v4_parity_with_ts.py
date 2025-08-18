@@ -146,6 +146,10 @@ def test_parity_with_ts(case: Dict[str, Any]) -> None:
 
     # 2) Запуск нашего API
     client = APIClient()
+    # Нормализуем age_key для API: для юрлиц 'over_5' недопустимо, используем '5_to_7'
+    age_key_for_api = case["age_key"]
+    if case["is_jur"] and age_key_for_api == "over_5":
+        age_key_for_api = "5_to_7"
     payload = {
         "price": case["price"],
         "currency": case["currency"],
@@ -153,7 +157,7 @@ def test_parity_with_ts(case: Dict[str, Any]) -> None:
         "hp": case["hp"],
         "vehicle_type": case["vehicle_type"],
         "engine_type": case["engine_type"],
-        "age_key": case["age_key"],
+        "age_key": age_key_for_api,
         "is_jur": case["is_jur"],
         "is_personal_use": case["is_personal_use"],
     }
