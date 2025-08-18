@@ -37,6 +37,30 @@ def _load_ts_module():
 ts = _load_ts_module()
 
 
+# Фиксируем курсы валют в TS-скрипте, чтобы совпадали с API FixedCurrencyProvider
+@pytest.fixture(autouse=True, scope="session")
+def _patch_ts_rates_to_fixed():  # type: ignore[no-untyped-def]
+    fixed = {
+        "RUB": 1.0,
+        "EUR": 100.0,
+        "USD": 95.0,
+        "CNY": 13.5,
+        "JPY": 0.65,
+        "KRW": 0.07,
+    }
+
+    def _fake_get_rates(_cls):  # cls ignored
+        return dict(fixed)
+
+    # Перепривязываем classmethod у TS RatesFetcher
+    orig = ts.RatesFetcher.get_currency_rates
+    ts.RatesFetcher.get_currency_rates = classmethod(_fake_get_rates)
+    try:
+        yield
+    finally:
+        ts.RatesFetcher.get_currency_rates = orig
+
+
 # Маппинги значений из нашего API в TS-энумы
 VT_MAP = {
     "quad": ts.VehicleType.QUAD,
