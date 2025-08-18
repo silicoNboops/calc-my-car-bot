@@ -34,6 +34,7 @@ collectstatic:
 
 createsuperuser:
 	python manage.py createsuperuser --email "" --username admin
+	python manage.py init_admin_telegram_id
 
 # Tests, linters & formatters
 fmt:

@@ -180,6 +180,26 @@ By following this guide and utilizing the advanced features, you'll be able to s
      docker compose up -d
      ```
 
+#### Инициализация суперпользователя и telegram_id в Docker
+
+- Создать суперпользователя и автоматически назначить ему `telegram_id = -1`:
+  ```bash
+  docker compose exec api make createsuperuser
+  ```
+  Примечание: цель `createsuperuser` в `Makefile` дополнительно запускает команду
+  `python manage.py init_admin_telegram_id`, чтобы гарантированно назначить `telegram_id = -1` первому
+  суперпользователю без этого поля.
+
+- Если суперпользователь уже существует, можно отдельно запустить только установку `telegram_id = -1`:
+  ```bash
+  docker compose exec api python manage.py init_admin_telegram_id
+  ```
+
+- Применение миграций:
+  ```bash
+  docker compose exec api python manage.py migrate
+  ```
+
 ---
 
 ## Калькулятор — основные правила (v4 по умолчанию)
