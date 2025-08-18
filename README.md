@@ -200,6 +200,45 @@ By following this guide and utilizing the advanced features, you'll be able to s
   docker compose exec api python manage.py migrate
   ```
 
+#### Прод: первый запуск (порядок действий)
+
+1) Применить миграции
+   ```bash
+   docker compose exec api python manage.py migrate
+   ```
+
+2) Создать суперпользователя (телега `-1` поставится автоматически)
+   ```bash
+   docker compose exec api make createsuperuser
+   ```
+
+3) Dry-run сидирования ставок (валидация без записи)
+   ```bash
+   docker compose exec -e ENVIRONMENT=production api make seed.rates.dryrun.prod
+   ```
+
+4) Сидирование ставок (очистка и базовая загрузка legacy → затем V4 non-car)
+   Внимание: первый шаг делает `--replace` и очищает таблицы ставок.
+   ```bash
+   docker compose exec -e ENVIRONMENT=production api make seed.rates.prod
+   ```
+
+5) Проверка количества записей
+   ```bash
+   docker compose exec api make check.rates
+   ```
+
+6) Перезапустить бота (если нужно)
+   ```bash
+   docker compose restart bot
+   ```
+
+7) Смотрим логи на случай ошибок
+   ```bash
+   docker compose logs -n 300 api
+   docker compose logs -n 300 bot
+   ```
+
 ---
 
 ## Калькулятор — основные правила (v4 по умолчанию)
