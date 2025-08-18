@@ -6,6 +6,7 @@ from typing import Any, Dict, List
 import pytest
 from rest_framework.test import APIClient
 from django.core.management import call_command
+from tests.utils import normalize_age_key_for_api
 
 # Автосидинг только V4 non-car+сопутствующие ставки через версионированную фикстуру
 @pytest.fixture(autouse=True, scope="session")
@@ -146,10 +147,8 @@ def test_parity_with_ts(case: Dict[str, Any]) -> None:
 
     # 2) Запуск нашего API
     client = APIClient()
-    # Нормализуем age_key для API: для юрлиц 'over_5' недопустимо, используем '5_to_7'
-    age_key_for_api = case["age_key"]
-    if case["is_jur"] and age_key_for_api == "over_5":
-        age_key_for_api = "5_to_7"
+    # Нормализуем age_key для API через общий хелпер
+    age_key_for_api = normalize_age_key_for_api(case["age_key"], case["is_jur"])
     payload = {
         "price": case["price"],
         "currency": case["currency"],
