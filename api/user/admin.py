@@ -4,6 +4,7 @@ from typing import Any
 
 from django.contrib import admin
 
+from api.common.admin import export_as_csv, export_as_json
 from api.user.models import User
 
 
@@ -32,13 +33,31 @@ class UserAdmin(admin.ModelAdmin):
     date_hierarchy = "date_joined"
     ordering = ("-date_joined",)
     list_per_page = 50
+    actions = [export_as_csv, export_as_json]
+
+    fieldsets = (
+        ("Учётная запись", {"fields": ("username", "password", "email")}),
+        (
+            "Права",
+            {
+                "fields": (
+                    "is_active",
+                    "is_staff",
+                    "is_superuser",
+                    "groups",
+                    "user_permissions",
+                ),
+            },
+        ),
+        ("Важные даты", {"fields": ("last_login", "date_joined")}),
+    )
 
     def save_model(
-        self,
-        request: Any,
-        obj: User,
-        form: None,
-        change: bool,  # noqa: FBT001
+            self,
+            request: Any,
+            obj: User,
+            form: None,
+            change: bool,  # noqa: FBT001
     ) -> None:
         """Update user password if it is not raw.
 
