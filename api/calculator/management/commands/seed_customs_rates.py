@@ -137,6 +137,8 @@ class Command(BaseCommand):
                         rate_percent=item.get("rate_percent"),
                         rate_eur_cc=item.get("rate_eur_cc"),
                         min_rate_eur_cc=item.get("min_rate_eur_cc"),
+                        rate_eur_hp=item.get("rate_eur_hp"),
+                        min_rate_eur_hp=item.get("min_rate_eur_hp"),
                     )
                     for item in merged["duty_rates"]
                 ])

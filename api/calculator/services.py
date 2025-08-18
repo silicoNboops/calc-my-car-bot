@@ -116,7 +116,156 @@ class CustomsCalculator:
                     "rate_percent": float(r.rate_percent or 0.0),
                     "min_rate_eur_cc": float(r.min_rate_eur_cc or 0.0),
                 })
+            elif r.unit == DutyUnit.EUR_HP:
+                rows.append({"max_hp": r.max_value or float("inf"), "rate_eur_hp": float(r.rate_eur_hp or 0.0)})
+            elif r.unit == DutyUnit.PERCENT_HP:
+                rows.append({
+                    "max_hp": r.max_value or float("inf"),
+                    "rate_percent": float(r.rate_percent or 0.0),
+                    "min_rate_eur_hp": float(r.min_rate_eur_hp or 0.0),
+                })
         return rows
+
+    def _collect_hp_rows(self, audience: str, age_group: str, unit: DutyUnit) -> list[dict]:
+        """Помощник: собрать hp-строки для EUR_HP или PERCENT_HP."""
+        rows: list[dict] = []
+        qs = (
+            self.duty_rates
+            .filter(audience=audience, age_group=age_group, unit=unit)
+            .order_by("max_value")
+        )
+        for r in qs:
+            if unit == DutyUnit.EUR_HP:
+                rows.append({"max_hp": r.max_value or float("inf"), "rate_eur_hp": float(r.rate_eur_hp or 0.0)})
+            else:  # PERCENT_HP
+                rows.append({
+                    "max_hp": r.max_value or float("inf"),
+                    "rate_percent": float(r.rate_percent or 0.0),
+                    "min_rate_eur_hp": float(r.min_rate_eur_hp or 0.0),
+                })
+        return rows
+
+    def _calc_duty_quad(self, price_eur: float, hp: int, age_key: AgeKey, is_jur: bool) -> float:
+        if not is_jur:
+            g = AgeGroup.UNDER_3 if age_key == AgeKeyChoices.UNDER_3 else AgeGroup.OVER_5
+            if g == AgeGroup.UNDER_3:
+                rows = self._collect_hp_rows(Audience.QUAD_PHYS, g, DutyUnit.PERCENT_HP)
+                if not rows:
+                    return 0.0
+                row = self._find_bracket(int(hp), rows, "max_hp")
+                rate_percent = float(row.get("rate_percent", 0.0))
+                if rate_percent > 1.0:
+                    rate_percent /= 100.0
+                duty_val = price_eur * rate_percent
+                duty_min = int(hp) * float(row.get("min_rate_eur_hp", 0.0))
+                return max(duty_val, duty_min)
+            else:
+                rows = self._collect_hp_rows(Audience.QUAD_PHYS, g, DutyUnit.EUR_HP)
+                if not rows:
+                    return 0.0
+                row = self._find_bracket(int(hp), rows, "max_hp")
+                return int(hp) * float(row.get("rate_eur_hp", 0.0))
+        else:
+            g = AgeGroup.UNDER_3 if age_key == AgeKeyChoices.UNDER_3 else AgeGroup.OVER_5
+            if g == AgeGroup.UNDER_3:
+                rows = list(self.duty_rates.filter(audience=Audience.QUAD_JUR, age_group=g, unit=DutyUnit.PERCENT))
+                if not rows:
+                    return 0.0
+                rate_percent = float(rows[0].rate_percent or 0.0)
+                if rate_percent > 1.0:
+                    rate_percent /= 100.0
+                return price_eur * rate_percent
+            else:
+                rows = self._collect_hp_rows(Audience.QUAD_JUR, g, DutyUnit.PERCENT_HP)
+                if not rows:
+                    return 0.0
+                row = rows[0]
+                rate_percent = float(row.get("rate_percent", 0.0))
+                if rate_percent > 1.0:
+                    rate_percent /= 100.0
+                return max(price_eur * rate_percent, int(hp) * float(row.get("min_rate_eur_hp", 0.0)))
+
+    def _calc_duty_snowmobile(self, price_eur: float, hp: int, age_key: AgeKey, is_jur: bool) -> float:
+        if not is_jur:
+            g = AgeGroup.UNDER_3 if age_key == AgeKeyChoices.UNDER_3 else AgeGroup.OVER_5
+            if g == AgeGroup.UNDER_3:
+                rows = self._collect_hp_rows(Audience.SNOWMOBILE_PHYS, g, DutyUnit.PERCENT_HP)
+                if not rows:
+                    return 0.0
+                row = self._find_bracket(int(hp), rows, "max_hp")
+                rate_percent = float(row.get("rate_percent", 0.0))
+                if rate_percent > 1.0:
+                    rate_percent /= 100.0
+                duty_val = price_eur * rate_percent
+                duty_min = int(hp) * float(row.get("min_rate_eur_hp", 0.0))
+                return max(duty_val, duty_min)
+            else:
+                rows = self._collect_hp_rows(Audience.SNOWMOBILE_PHYS, g, DutyUnit.EUR_HP)
+                if not rows:
+                    return 0.0
+                row = self._find_bracket(int(hp), rows, "max_hp")
+                return int(hp) * float(row.get("rate_eur_hp", 0.0))
+        else:
+            g = AgeGroup.UNDER_3 if age_key == AgeKeyChoices.UNDER_3 else AgeGroup.OVER_5
+            if g == AgeGroup.UNDER_3:
+                rows = list(self.duty_rates.filter(audience=Audience.SNOWMOBILE_JUR, age_group=g, unit=DutyUnit.PERCENT))
+                if not rows:
+                    return 0.0
+                rate_percent = float(rows[0].rate_percent or 0.0)
+                if rate_percent > 1.0:
+                    rate_percent /= 100.0
+                return price_eur * rate_percent
+            else:
+                rows = self._collect_hp_rows(Audience.SNOWMOBILE_JUR, g, DutyUnit.PERCENT_HP)
+                if not rows:
+                    return 0.0
+                row = rows[0]
+                rate_percent = float(row.get("rate_percent", 0.0))
+                if rate_percent > 1.0:
+                    rate_percent /= 100.0
+                return max(price_eur * rate_percent, int(hp) * float(row.get("min_rate_eur_hp", 0.0)))
+
+    def _calc_duty_motorcycle(self, price_eur: float, engine_cc: int, age_key: AgeKey, is_jur: bool) -> float:
+        cc = int(engine_cc)
+        if not is_jur:
+            g = AgeGroup.UNDER_3 if age_key == AgeKeyChoices.UNDER_3 else AgeGroup.OVER_5
+            if g == AgeGroup.UNDER_3:
+                rows = self.duty_rates.filter(audience=Audience.MOTORCYCLE_PHYS, age_group=g, unit=DutyUnit.PERCENT).order_by("max_value")
+                table = [{"max_cc": float(r.max_value or float("inf")), "rate_percent": float(r.rate_percent or 0.0), "min_rate_eur_cc": float(r.min_rate_eur_cc or 0.0)} for r in rows]
+                if not table:
+                    return 0.0
+                row = self._find_bracket(cc, table, "max_cc")
+                rate_percent = float(row.get("rate_percent", 0.0))
+                if rate_percent > 1.0:
+                    rate_percent /= 100.0
+                return max(price_eur * rate_percent, cc * float(row.get("min_rate_eur_cc", 0.0)))
+            else:
+                rows = self.duty_rates.filter(audience=Audience.MOTORCYCLE_PHYS, age_group=g, unit=DutyUnit.EUR_CC).order_by("max_value")
+                table = [{"max_cc": float(r.max_value or float("inf")), "rate_eur_cc": float(r.rate_eur_cc or 0.0)} for r in rows]
+                if not table:
+                    return 0.0
+                row = self._find_bracket(cc, table, "max_cc")
+                return cc * float(row.get("rate_eur_cc", 0.0))
+        else:
+            g = AgeGroup.UNDER_3 if age_key == AgeKeyChoices.UNDER_3 else AgeGroup.OVER_5
+            if g == AgeGroup.UNDER_3:
+                rows = list(self.duty_rates.filter(audience=Audience.MOTORCYCLE_JUR, age_group=g, unit=DutyUnit.PERCENT))
+                if not rows:
+                    return 0.0
+                rate_percent = float(rows[0].rate_percent or 0.0)
+                if rate_percent > 1.0:
+                    rate_percent /= 100.0
+                return price_eur * rate_percent
+            else:
+                rows = self.duty_rates.filter(audience=Audience.MOTORCYCLE_JUR, age_group=g, unit=DutyUnit.PERCENT).order_by("max_value")
+                table = [{"max_cc": float(r.max_value or float("inf")), "rate_percent": float(r.rate_percent or 0.0), "min_rate_eur_cc": float(r.min_rate_eur_cc or 0.0)} for r in rows]
+                if not table:
+                    return 0.0
+                row = self._find_bracket(cc, table, "max_cc")
+                rate_percent = float(row.get("rate_percent", 0.0))
+                if rate_percent > 1.0:
+                    rate_percent /= 100.0
+                return max(price_eur * rate_percent, cc * float(row.get("min_rate_eur_cc", 0.0)))
 
     def _calc_duty(self, price_eur: float, engine_cc: int, age_key: AgeKey, is_jur: bool, engine_type: EngineType) -> float:
         if not is_jur:
@@ -293,89 +442,11 @@ class CustomsCalculator:
                 else:
                     duty_eur = self._calc_duty(price_eur, int(data.engine_cc), age, data.is_jur, eng)
         elif veh == VehicleTypeChoices.QUAD:
-            # v4 QUAD_DUTY
-            if not data.is_jur:
-                # Физлица: разбивка по возрасту, пороги по мощности (hp)
-                if age == AgeKeyChoices.UNDER_3:
-                    rate = 0.25
-                    min_map = {"le_50": 1.0, "gt_50": 2.0}
-                    key = "le_50" if int(data.hp) <= 50 else "gt_50"
-                    duty_by_value = price_eur * rate
-                    duty_by_power = int(data.hp) * float(min_map[key])
-                    duty_eur = max(duty_by_value, duty_by_power)
-                else:
-                    eur_hp = {"le_50": 1.0, "gt_50": 2.0}
-                    key = "le_50" if int(data.hp) <= 50 else "gt_50"
-                    duty_eur = int(data.hp) * float(eur_hp[key])
-            else:
-                # ЮЛ: до 3 лет — 15% от стоимости, старше — 20% но не менее 0.5 EUR/л.с.
-                if age == AgeKeyChoices.UNDER_3:
-                    duty_eur = price_eur * 0.15
-                else:
-                    duty_by_value = price_eur * 0.20
-                    duty_by_power = int(data.hp) * 0.5
-                    duty_eur = max(duty_by_value, duty_by_power)
+            duty_eur = self._calc_duty_quad(price_eur, int(data.hp), age, data.is_jur)
         elif veh == VehicleTypeChoices.SNOWMOBILE:
-            # v4 SNOWMOBILE_DUTY
-            if not data.is_jur:
-                if age == AgeKeyChoices.UNDER_3:
-                    rate = 0.15
-                    min_map = {"le_100": 1.5, "gt_100": 3.0}
-                    key = "le_100" if int(data.hp) <= 100 else "gt_100"
-                    duty_by_value = price_eur * rate
-                    duty_by_power = int(data.hp) * float(min_map[key])
-                    duty_eur = max(duty_by_value, duty_by_power)
-                else:
-                    eur_hp = {"le_100": 1.5, "gt_100": 3.0}
-                    key = "le_100" if int(data.hp) <= 100 else "gt_100"
-                    duty_eur = int(data.hp) * float(eur_hp[key])
-            else:
-                if age == AgeKeyChoices.UNDER_3:
-                    duty_eur = price_eur * 0.10
-                else:
-                    duty_by_value = price_eur * 0.15
-                    duty_by_power = int(data.hp) * 1.0
-                    duty_eur = max(duty_by_value, duty_by_power)
+            duty_eur = self._calc_duty_snowmobile(price_eur, int(data.hp), age, data.is_jur)
         elif veh == VehicleTypeChoices.MOTORCYCLE:
-            # v4 MOTORCYCLE_DUTY
-            cc = int(data.engine_cc)
-            if not data.is_jur:
-                if age == AgeKeyChoices.UNDER_3:
-                    # Таблица: (<=125) 10% мин 0.8; (<=500) 15% мин 1.0; (<=800) 20% мин 1.2; (>800) 20% мин 1.5
-                    if cc <= 125:
-                        rate, min_eur_cc = 0.10, 0.8
-                    elif cc <= 500:
-                        rate, min_eur_cc = 0.15, 1.0
-                    elif cc <= 800:
-                        rate, min_eur_cc = 0.20, 1.2
-                    else:
-                        rate, min_eur_cc = 0.20, 1.5
-                    duty_eur = max(price_eur * rate, cc * min_eur_cc)
-                else:
-                    # Таблица €/см³: (<=125) 0.8; (<=500) 1.0; (<=800) 1.2; (>800) 1.5
-                    if cc <= 125:
-                        eur_cc = 0.8
-                    elif cc <= 500:
-                        eur_cc = 1.0
-                    elif cc <= 800:
-                        eur_cc = 1.2
-                    else:
-                        eur_cc = 1.5
-                    duty_eur = cc * eur_cc
-            else:
-                if age == AgeKeyChoices.UNDER_3:
-                    duty_eur = price_eur * 0.06
-                else:
-                    # Таблица: (<=125) 10% мин 0.10; (<=500) 10% мин 0.15; (<=800) 10% мин 0.20; (>800) 10% мин 0.25
-                    if cc <= 125:
-                        rate, min_eur_cc = 0.10, 0.10
-                    elif cc <= 500:
-                        rate, min_eur_cc = 0.10, 0.15
-                    elif cc <= 800:
-                        rate, min_eur_cc = 0.10, 0.20
-                    else:
-                        rate, min_eur_cc = 0.10, 0.25
-                    duty_eur = max(price_eur * rate, cc * min_eur_cc)
+            duty_eur = self._calc_duty_motorcycle(price_eur, int(data.engine_cc), age, data.is_jur)
         else:
             duty_eur = 0.0
         duty_rub = duty_eur * float(fx.get(CurrencyChoices.EUR.value, 1.0))
