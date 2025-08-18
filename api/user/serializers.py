@@ -8,5 +8,8 @@ from api.user.models import User
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ("id", "username", "email", "password")
-        extra_kwargs = {"password": {"write_only": True}}  # noqa: RUF012
+        fields = ("id", "telegram_id", "username", "email", "password")
+        extra_kwargs = {
+            "password": {"write_only": True},  # noqa: RUF012
+            "telegram_id": {"read_only": True},
+        }

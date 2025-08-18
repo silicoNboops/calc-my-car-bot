@@ -47,12 +47,19 @@ async def handle_start_command(message: Message, state: FSMContext) -> None:
         "first_name": first_name,
         "last_name": last_name,
         "email": "",
+        "telegram_id": tg.id,
     }
     logger.info("/start юзер данные епта: %s", payload)
 
+    # Простой путь: создаем/получаем пользователя по telegram_id
     _, is_new = await User.objects.aget_or_create(
-        pk=message.from_user.id,
-        defaults=payload,
+        telegram_id=tg.id,
+        defaults={
+            "username": username,
+            "first_name": first_name,
+            "last_name": last_name,
+            "email": "",
+        },
     )
 
     base = "Вас приветствует ChinaMotorsBot!"
