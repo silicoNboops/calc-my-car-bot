@@ -36,5 +36,14 @@
   ],
   "util_fees": [],
   "accise_rates": [],
-  "customs_fees": []
+  "customs_fees": [
+    {"max_value_rub": 200000,   "fee_rub": 1067},
+    {"max_value_rub": 450000,   "fee_rub": 2134},
+    {"max_value_rub": 1200000,  "fee_rub": 4269},
+    {"max_value_rub": 2700000,  "fee_rub": 11746},
+    {"max_value_rub": 4200000,  "fee_rub": 16524},
+    {"max_value_rub": 5500000,  "fee_rub": 21344},
+    {"max_value_rub": 7000000,  "fee_rub": 27540},
+    {"max_value_rub": 1e18,     "fee_rub": 30000}
+  ]
 }
