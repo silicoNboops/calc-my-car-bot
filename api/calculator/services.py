@@ -1,21 +1,15 @@
 from __future__ import annotations
 
 import logging
-import requests
+import os
+from dataclasses import dataclass
 from typing import Optional
 
+import requests
+from django.conf import settings
 from django.core.cache import cache
 from django.db.models import QuerySet
-from django.conf import settings
-from dataclasses import dataclass
 
-from api.calculator.models import (
-    AcciseRate,
-    CustomsFee,
-    DutyRate,
-    Settings,
-    UtilFee,
-)
 from api.calculator.choices import (
     EngineType as EngineTypeChoices,
     VehicleType as VehicleTypeChoices,
@@ -25,6 +19,13 @@ from api.calculator.choices import (
     Currency as CurrencyChoices,
     AgeKey as AgeKeyChoices,
     UtilFeeKind,
+)
+from api.calculator.models import (
+    AcciseRate,
+    CustomsFee,
+    DutyRate,
+    Settings,
+    UtilFee,
 )
 
 # Используем Django TextChoices как единый источник истины.
@@ -292,21 +293,89 @@ class CustomsCalculator:
                 else:
                     duty_eur = self._calc_duty(price_eur, int(data.engine_cc), age, data.is_jur, eng)
         elif veh == VehicleTypeChoices.QUAD:
-            # v2 QUAD_DUTY: new 30%, old 35%, min €/cc: 1.2/1.5
-            is_new = (age == AgeKeyChoices.UNDER_3)
-            rate = 0.30 if is_new else 0.35
-            min_eur_cc = 1.2 if is_new else 1.5
-            duty_eur = max(price_eur * rate, int(data.engine_cc) * min_eur_cc)
-        elif veh == VehicleTypeChoices.SNOWMOBILE:
-            # v2 SNOWMOBILE_DUTY: 5% без минимума
-            duty_eur = price_eur * 0.05
-        elif veh == VehicleTypeChoices.MOTORCYCLE:
-            # v2 MOTORCYCLE_DUTY: 15% с минимумом €/cc, зависящим от импортера
-            if not data.is_jur and data.is_personal_use:
-                min_eur_cc = 0.5
+            # v4 QUAD_DUTY
+            if not data.is_jur:
+                # Физлица: разбивка по возрасту, пороги по мощности (hp)
+                if age == AgeKeyChoices.UNDER_3:
+                    rate = 0.25
+                    min_map = {"le_50": 1.0, "gt_50": 2.0}
+                    key = "le_50" if int(data.hp) <= 50 else "gt_50"
+                    duty_by_value = price_eur * rate
+                    duty_by_power = int(data.hp) * float(min_map[key])
+                    duty_eur = max(duty_by_value, duty_by_power)
+                else:
+                    eur_hp = {"le_50": 1.0, "gt_50": 2.0}
+                    key = "le_50" if int(data.hp) <= 50 else "gt_50"
+                    duty_eur = int(data.hp) * float(eur_hp[key])
             else:
-                min_eur_cc = 0.8
-            duty_eur = max(price_eur * 0.15, int(data.engine_cc) * min_eur_cc)
+                # ЮЛ: до 3 лет — 15% от стоимости, старше — 20% но не менее 0.5 EUR/л.с.
+                if age == AgeKeyChoices.UNDER_3:
+                    duty_eur = price_eur * 0.15
+                else:
+                    duty_by_value = price_eur * 0.20
+                    duty_by_power = int(data.hp) * 0.5
+                    duty_eur = max(duty_by_value, duty_by_power)
+        elif veh == VehicleTypeChoices.SNOWMOBILE:
+            # v4 SNOWMOBILE_DUTY
+            if not data.is_jur:
+                if age == AgeKeyChoices.UNDER_3:
+                    rate = 0.15
+                    min_map = {"le_100": 1.5, "gt_100": 3.0}
+                    key = "le_100" if int(data.hp) <= 100 else "gt_100"
+                    duty_by_value = price_eur * rate
+                    duty_by_power = int(data.hp) * float(min_map[key])
+                    duty_eur = max(duty_by_value, duty_by_power)
+                else:
+                    eur_hp = {"le_100": 1.5, "gt_100": 3.0}
+                    key = "le_100" if int(data.hp) <= 100 else "gt_100"
+                    duty_eur = int(data.hp) * float(eur_hp[key])
+            else:
+                if age == AgeKeyChoices.UNDER_3:
+                    duty_eur = price_eur * 0.10
+                else:
+                    duty_by_value = price_eur * 0.15
+                    duty_by_power = int(data.hp) * 1.0
+                    duty_eur = max(duty_by_value, duty_by_power)
+        elif veh == VehicleTypeChoices.MOTORCYCLE:
+            # v4 MOTORCYCLE_DUTY
+            cc = int(data.engine_cc)
+            if not data.is_jur:
+                if age == AgeKeyChoices.UNDER_3:
+                    # Таблица: (<=125) 10% мин 0.8; (<=500) 15% мин 1.0; (<=800) 20% мин 1.2; (>800) 20% мин 1.5
+                    if cc <= 125:
+                        rate, min_eur_cc = 0.10, 0.8
+                    elif cc <= 500:
+                        rate, min_eur_cc = 0.15, 1.0
+                    elif cc <= 800:
+                        rate, min_eur_cc = 0.20, 1.2
+                    else:
+                        rate, min_eur_cc = 0.20, 1.5
+                    duty_eur = max(price_eur * rate, cc * min_eur_cc)
+                else:
+                    # Таблица €/см³: (<=125) 0.8; (<=500) 1.0; (<=800) 1.2; (>800) 1.5
+                    if cc <= 125:
+                        eur_cc = 0.8
+                    elif cc <= 500:
+                        eur_cc = 1.0
+                    elif cc <= 800:
+                        eur_cc = 1.2
+                    else:
+                        eur_cc = 1.5
+                    duty_eur = cc * eur_cc
+            else:
+                if age == AgeKeyChoices.UNDER_3:
+                    duty_eur = price_eur * 0.06
+                else:
+                    # Таблица: (<=125) 10% мин 0.10; (<=500) 10% мин 0.15; (<=800) 10% мин 0.20; (>800) 10% мин 0.25
+                    if cc <= 125:
+                        rate, min_eur_cc = 0.10, 0.10
+                    elif cc <= 500:
+                        rate, min_eur_cc = 0.10, 0.15
+                    elif cc <= 800:
+                        rate, min_eur_cc = 0.10, 0.20
+                    else:
+                        rate, min_eur_cc = 0.10, 0.25
+                    duty_eur = max(price_eur * rate, cc * min_eur_cc)
         else:
             duty_eur = 0.0
         duty_rub = duty_eur * float(fx.get(CurrencyChoices.EUR.value, 1.0))
