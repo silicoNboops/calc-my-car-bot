@@ -10,7 +10,7 @@ PROMPT_ENTER_ENGINE_CC = "Введите объём двигателя в см³
 PROMPT_CHOOSE_AGE = "Выберите возраст автомобиля:"
 PROMPT_CHOOSE_VEHICLE_TYPE = "Выберите тип автомобиля:"
 
-CONTACT_LINE = "\nСвяжитесь с нами: @Slaford - Слафординка"
+CONTACT_LINE = "\nСвяжитесь с нами: <b>@jonnyfase</b>"
 
 # Прочее
 RESET_MESSAGE = "Сбросил состояние. Можем начать заново: нажмите 'Калькулятор' или введите /calc"
