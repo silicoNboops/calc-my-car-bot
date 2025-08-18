@@ -62,8 +62,8 @@ class DutyRate(models.Model):
             ),
         ]
         ordering = ["audience", "age_group", "unit", "max_value"]
-        verbose_name = "Duty Rate"
-        verbose_name_plural = "Duty Rates"
+        verbose_name = "Ставка пошлины"
+        verbose_name_plural = "Ставки пошлины"
 
     def __str__(self) -> str:  # pragma: no cover - admin/debug
         return f"{self.audience} {self.age_group} {self.unit} <= {self.max_value}"
@@ -77,8 +77,8 @@ class UtilFee(models.Model):
     class Meta:
         indexes = [models.Index(fields=["kind", "max_cc"]) ]
         ordering = ["kind", "max_cc"]
-        verbose_name = "Utilization Fee"
-        verbose_name_plural = "Utilization Fees"
+        verbose_name = "Утилизационный сбор"
+        verbose_name_plural = "Утилизационные сборы"
 
     def __str__(self) -> str:  # pragma: no cover
         return f"{self.kind} <= {self.max_cc}: {self.coeff}"
@@ -91,8 +91,8 @@ class AcciseRate(models.Model):
     class Meta:
         indexes = [models.Index(fields=["max_hp"]) ]
         ordering = ["max_hp"]
-        verbose_name = "Accise Rate"
-        verbose_name_plural = "Accise Rates"
+        verbose_name = "Акцизная ставка"
+        verbose_name_plural = "Акцизные ставки"
 
     def __str__(self) -> str:  # pragma: no cover
         return f"<= {self.max_hp} hp: {self.rate_rub_per_hp} RUB/hp"
@@ -105,8 +105,8 @@ class CustomsFee(models.Model):
     class Meta:
         indexes = [models.Index(fields=["max_value_rub"]) ]
         ordering = ["max_value_rub"]
-        verbose_name = "Customs Fee"
-        verbose_name_plural = "Customs Fees"
+        verbose_name = "Таможенный сбор"
+        verbose_name_plural = "Таможенные сборы"
 
     def __str__(self) -> str:  # pragma: no cover
         return f"<= {self.max_value_rub} RUB: {self.fee_rub} RUB"
@@ -119,8 +119,8 @@ class Settings(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        verbose_name = "Calculator Settings"
-        verbose_name_plural = "Calculator Settings"
+        verbose_name = "Настройки калькулятора"
+        verbose_name_plural = "Настройки калькулятора"
 
     def __str__(self) -> str:  # pragma: no cover
         return f"VAT={self.vat_rate}, COMM={self.company_commission_rub}"
