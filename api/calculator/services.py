@@ -252,51 +252,68 @@ class CustomsCalculator:
     def estimate(self, data: EstimateInput) -> EstimateResult:
         # Конвертация валют (как в legacy): fx — RUB за единицу валюты
         fx = self.currency_rates
-        if data.currency.value not in fx:
+        # Нормализация входных значений: допускаем как TextChoices, так и строки
+        cur = data.currency if not isinstance(data.currency, str) else CurrencyChoices(data.currency)
+        veh = data.vehicle_type if not isinstance(data.vehicle_type, str) else VehicleTypeChoices(data.vehicle_type)
+        eng = data.engine_type if not isinstance(data.engine_type, str) else EngineTypeChoices(data.engine_type)
+        age = data.age_key if not isinstance(data.age_key, str) else AgeKeyChoices(data.age_key)
+
+        if cur.value not in fx:
             msg = f"Unsupported currency: {data.currency}"
             raise ValueError(msg)
-        price_rub = float(data.price) * float(fx[data.currency.value])
+        price_rub = float(data.price) * float(fx[cur.value])
         price_eur = price_rub / float(fx.get(CurrencyChoices.EUR.value, 1.0))
 
         is_commercial = data.is_jur or (data.is_personal_use is False)
+        # Фича-флаг для включения правил v4
+        v4_enabled = str(os.environ.get("V4_CALC_ENABLED", "false")).lower() in ("1", "true", "yes")
 
         # Пошлина: зависит от vehicle_type
-        if data.vehicle_type == VehicleTypeChoices.CAR:
+        if veh == VehicleTypeChoices.CAR:
             if not data.is_jur:
                 # ФЛ: для EV/гибридов льготы
-                if data.engine_type in (EngineTypeChoices.ELECTRO, EngineTypeChoices.HYBRID_SERIES, EngineTypeChoices.HYBRID_PARALLEL):
-                    if data.age_key == AgeKeyChoices.UNDER_3:
-                        rate = 0.15
-                        min_eur_cc = 0.0
-                        duty_from_price = price_eur * rate
-                        duty_from_volume = int(data.engine_cc) * min_eur_cc
-                        duty_eur = max(duty_from_price, duty_from_volume)
+                if eng in (EngineTypeChoices.ELECTRO, EngineTypeChoices.HYBRID_SERIES, EngineTypeChoices.HYBRID_PARALLEL):
+                    if v4_enabled and eng == EngineTypeChoices.ELECTRO:
+                        # v4: EV всегда 15% независимо от возраста и без минимума €/см³
+                        duty_eur = price_eur * 0.15
                     else:
-                        rate_eur_cc = 1.0
-                        duty_eur = int(data.engine_cc) * rate_eur_cc
+                        if age == AgeKeyChoices.UNDER_3:
+                            rate = 0.15
+                            min_eur_cc = 0.0
+                            duty_from_price = price_eur * rate
+                            duty_from_volume = int(data.engine_cc) * min_eur_cc
+                            duty_eur = max(duty_from_price, duty_from_volume)
+                        else:
+                            rate_eur_cc = 1.0
+                            duty_eur = int(data.engine_cc) * rate_eur_cc
                 else:
-                    duty_eur = self._calc_duty(price_eur, int(data.engine_cc), data.age_key, data.is_jur, data.engine_type)
+                    duty_eur = self._calc_duty(price_eur, int(data.engine_cc), age, data.is_jur, eng)
             else:
                 # ЮЛ: EV/гибриды по v2, иначе текущие правила из БД
-                if data.engine_type == EngineTypeChoices.ELECTRO:
+                if eng == EngineTypeChoices.ELECTRO:
+                    # v4 и v3 совпадают: 15% от стоимости
                     duty_eur = price_eur * 0.15
-                elif data.engine_type in (EngineTypeChoices.HYBRID_SERIES, EngineTypeChoices.HYBRID_PARALLEL):
-                    is_new = (data.age_key == AgeKeyChoices.UNDER_3)
-                    rate = 0.15 if is_new else 0.18
-                    min_eur_cc = 0.30 if is_new else 1.20
-                    duty_eur = max(price_eur * rate, int(data.engine_cc) * min_eur_cc)
+                elif eng in (EngineTypeChoices.HYBRID_SERIES, EngineTypeChoices.HYBRID_PARALLEL):
+                    if v4_enabled:
+                        # v4: гибриды как бензин — считаем по таблицам через _calc_duty
+                        duty_eur = self._calc_duty(price_eur, int(data.engine_cc), age, data.is_jur, EngineTypeChoices.BENZIN)
+                    else:
+                        is_new = (age == AgeKeyChoices.UNDER_3)
+                        rate = 0.15 if is_new else 0.18
+                        min_eur_cc = 0.30 if is_new else 1.20
+                        duty_eur = max(price_eur * rate, int(data.engine_cc) * min_eur_cc)
                 else:
-                    duty_eur = self._calc_duty(price_eur, int(data.engine_cc), data.age_key, data.is_jur, data.engine_type)
-        elif data.vehicle_type == VehicleTypeChoices.QUAD:
+                    duty_eur = self._calc_duty(price_eur, int(data.engine_cc), age, data.is_jur, eng)
+        elif veh == VehicleTypeChoices.QUAD:
             # v2 QUAD_DUTY: new 30%, old 35%, min €/cc: 1.2/1.5
-            is_new = (data.age_key == AgeKeyChoices.UNDER_3)
+            is_new = (age == AgeKeyChoices.UNDER_3)
             rate = 0.30 if is_new else 0.35
             min_eur_cc = 1.2 if is_new else 1.5
             duty_eur = max(price_eur * rate, int(data.engine_cc) * min_eur_cc)
-        elif data.vehicle_type == VehicleTypeChoices.SNOWMOBILE:
+        elif veh == VehicleTypeChoices.SNOWMOBILE:
             # v2 SNOWMOBILE_DUTY: 5% без минимума
             duty_eur = price_eur * 0.05
-        elif data.vehicle_type == VehicleTypeChoices.MOTORCYCLE:
+        elif veh == VehicleTypeChoices.MOTORCYCLE:
             # v2 MOTORCYCLE_DUTY: 15% с минимумом €/cc, зависящим от импортера
             if not data.is_jur and data.is_personal_use:
                 min_eur_cc = 0.5
@@ -307,10 +324,13 @@ class CustomsCalculator:
             duty_eur = 0.0
         duty_rub = duty_eur * float(fx.get(CurrencyChoices.EUR.value, 1.0))
 
-        util_fee = self._calc_util(is_commercial, data.age_key, int(data.engine_cc), data.engine_type, data.vehicle_type)
-        # Акциз по v3: только для легковых автомобилей, для прочих ТС не применяется
-        if data.vehicle_type == VehicleTypeChoices.CAR:
-            accise_rub = self._calc_accise(int(data.hp), is_commercial, data.engine_type, data.dvs_hp, data.electric_hp)
+        util_fee = self._calc_util(is_commercial, age, int(data.engine_cc), eng, veh)
+        # Акциз: только для легковых автомобилей. В v4 для EV акциз = 0.
+        if veh == VehicleTypeChoices.CAR:
+            if v4_enabled and eng == EngineTypeChoices.ELECTRO:
+                accise_rub = 0.0
+            else:
+                accise_rub = self._calc_accise(int(data.hp), is_commercial, eng, data.dvs_hp, data.electric_hp)
         else:
             accise_rub = 0.0
         vat_rub = self._calc_vat(price_rub, duty_rub, accise_rub, is_commercial)
