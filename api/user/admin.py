@@ -13,6 +13,8 @@ class UserAdmin(admin.ModelAdmin):
     filter_horizontal = ("groups", "user_permissions")
 
     list_display = (
+        "id",
+        "telegram_id",
         "username",
         "email",
         "is_active",
@@ -36,7 +38,7 @@ class UserAdmin(admin.ModelAdmin):
     actions = [export_as_csv, export_as_json]
 
     fieldsets = (
-        ("Учётная запись", {"fields": ("username", "password", "email")}),
+        ("Учётная запись", {"fields": ("telegram_id", "username", "password", "email")}),
         (
             "Права",
             {
