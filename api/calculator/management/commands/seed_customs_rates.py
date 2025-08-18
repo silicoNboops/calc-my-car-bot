@@ -59,7 +59,12 @@ class Command(BaseCommand):
             raise CommandError(msg)
 
         files = sorted(fixtures_dir.glob("*.json"))
-        if version_tag:
+        # По умолчанию игнорируем шаблонные файлы (например, customs_rates_template.json)
+        # чтобы они не вмешивались в сидинг в dev/tests. При указании --version-tag
+        # фильтрация по шаблонам не применяется — оставляем полный контроль пользователю.
+        if not version_tag:
+            files = [p for p in files if "template" not in p.name.lower()]
+        else:
             files = [p for p in files if version_tag in p.name]
         if not files:
             self.stdout.write(self.style.WARNING("No fixture files found."))
