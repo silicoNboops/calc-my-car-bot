@@ -4,7 +4,14 @@ import pytest
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
+from django.core.management import call_command
 
+
+# Автозагрузка ставок для тестовой БД из JSON-фикстур (один раз на сессию)
+@pytest.fixture(autouse=True, scope="session")
+def _seed_customs_rates(django_db_setup, django_db_blocker):  # type: ignore[no-untyped-def]
+    with django_db_blocker.unblock():
+        call_command("seed_customs_rates", "--replace", "--path", "api/calculator/fixtures")
 
 # QUAD tests
 @pytest.mark.django_db()
