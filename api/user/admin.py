@@ -13,10 +13,25 @@ class UserAdmin(admin.ModelAdmin):
 
     list_display = (
         "username",
+        "email",
         "is_active",
         "is_staff",
         "is_superuser",
+        "date_joined",
+        "last_login",
     )
+    list_filter = (
+        "is_active",
+        "is_staff",
+        "is_superuser",
+        "date_joined",
+        "last_login",
+    )
+    search_fields = ("username", "email")
+    readonly_fields = ("date_joined", "last_login")
+    date_hierarchy = "date_joined"
+    ordering = ("-date_joined",)
+    list_per_page = 50
 
     def save_model(
         self,
