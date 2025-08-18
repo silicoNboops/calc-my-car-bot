@@ -1,0 +1,49 @@
+{
+  "settings": {},
+  "duty_rates": [
+    
+    {"audience": "QUAD_PHYS", "age_group": "under_3_years", "unit": "percent_hp", "max_value": 50,    "rate_percent": 25, "rate_eur_cc": null, "min_rate_eur_hp": 1.0},
+    {"audience": "QUAD_PHYS", "age_group": "under_3_years", "unit": "percent_hp", "max_value": 1e18,  "rate_percent": 25, "rate_eur_cc": null, "min_rate_eur_hp": 2.0},
+    {"audience": "QUAD_PHYS", "age_group": "over_5_years",  "unit": "eur_hp",     "max_value": 50,    "rate_eur_hp": 1.0},
+    {"audience": "QUAD_PHYS", "age_group": "over_5_years",  "unit": "eur_hp",     "max_value": 1e18,  "rate_eur_hp": 2.0},
+
+    {"audience": "QUAD_JUR",  "age_group": "under_3_years", "unit": "percent",    "max_value": 1e18,  "rate_percent": 15},
+    {"audience": "QUAD_JUR",  "age_group": "over_5_years",  "unit": "percent_hp", "max_value": 1e18,  "rate_percent": 20, "min_rate_eur_hp": 0.5},
+
+    {"audience": "SNOWMOBILE_PHYS", "age_group": "under_3_years", "unit": "percent_hp", "max_value": 100,   "rate_percent": 15, "min_rate_eur_hp": 1.5},
+    {"audience": "SNOWMOBILE_PHYS", "age_group": "under_3_years", "unit": "percent_hp", "max_value": 1e18,  "rate_percent": 15, "min_rate_eur_hp": 3.0},
+    {"audience": "SNOWMOBILE_PHYS", "age_group": "over_5_years",  "unit": "eur_hp",     "max_value": 100,   "rate_eur_hp": 1.5},
+    {"audience": "SNOWMOBILE_PHYS", "age_group": "over_5_years",  "unit": "eur_hp",     "max_value": 1e18,  "rate_eur_hp": 3.0},
+
+    {"audience": "SNOWMOBILE_JUR",  "age_group": "under_3_years", "unit": "percent",    "max_value": 1e18,  "rate_percent": 10},
+    {"audience": "SNOWMOBILE_JUR",  "age_group": "over_5_years",  "unit": "percent_hp", "max_value": 1e18,  "rate_percent": 15, "min_rate_eur_hp": 1.0},
+
+    {"audience": "MOTORCYCLE_PHYS", "age_group": "under_3_years", "unit": "percent",    "max_value": 125,   "rate_percent": 10, "min_rate_eur_cc": 0.8},
+    {"audience": "MOTORCYCLE_PHYS", "age_group": "under_3_years", "unit": "percent",    "max_value": 500,   "rate_percent": 15, "min_rate_eur_cc": 1.0},
+    {"audience": "MOTORCYCLE_PHYS", "age_group": "under_3_years", "unit": "percent",    "max_value": 800,   "rate_percent": 20, "min_rate_eur_cc": 1.2},
+    {"audience": "MOTORCYCLE_PHYS", "age_group": "under_3_years", "unit": "percent",    "max_value": 1e18,  "rate_percent": 20, "min_rate_eur_cc": 1.5},
+
+    {"audience": "MOTORCYCLE_PHYS", "age_group": "over_5_years",  "unit": "eur_cc",     "max_value": 125,   "rate_eur_cc": 0.8},
+    {"audience": "MOTORCYCLE_PHYS", "age_group": "over_5_years",  "unit": "eur_cc",     "max_value": 500,   "rate_eur_cc": 1.0},
+    {"audience": "MOTORCYCLE_PHYS", "age_group": "over_5_years",  "unit": "eur_cc",     "max_value": 800,   "rate_eur_cc": 1.2},
+    {"audience": "MOTORCYCLE_PHYS", "age_group": "over_5_years",  "unit": "eur_cc",     "max_value": 1e18,  "rate_eur_cc": 1.5},
+
+    {"audience": "MOTORCYCLE_JUR",  "age_group": "under_3_years", "unit": "percent",    "max_value": 1e18,  "rate_percent": 6},
+    {"audience": "MOTORCYCLE_JUR",  "age_group": "over_5_years",  "unit": "percent",    "max_value": 125,   "rate_percent": 10, "min_rate_eur_cc": 0.10},
+    {"audience": "MOTORCYCLE_JUR",  "age_group": "over_5_years",  "unit": "percent",    "max_value": 500,   "rate_percent": 10, "min_rate_eur_cc": 0.15},
+    {"audience": "MOTORCYCLE_JUR",  "age_group": "over_5_years",  "unit": "percent",    "max_value": 800,   "rate_percent": 10, "min_rate_eur_cc": 0.20},
+    {"audience": "MOTORCYCLE_JUR",  "age_group": "over_5_years",  "unit": "percent",    "max_value": 1e18,  "rate_percent": 10, "min_rate_eur_cc": 0.25}
+  ],
+  "util_fees": [],
+  "accise_rates": [],
+  "customs_fees": [
+    {"max_value_rub": 200000,   "fee_rub": 1067},
+    {"max_value_rub": 450000,   "fee_rub": 2134},
+    {"max_value_rub": 1200000,  "fee_rub": 4269},
+    {"max_value_rub": 2700000,  "fee_rub": 11746},
+    {"max_value_rub": 4200000,  "fee_rub": 16524},
+    {"max_value_rub": 5500000,  "fee_rub": 21344},
+    {"max_value_rub": 7000000,  "fee_rub": 27540},
+    {"max_value_rub": 1e18,     "fee_rub": 30000}
+  ]
+}

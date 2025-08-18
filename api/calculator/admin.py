@@ -13,7 +13,17 @@ from api.calculator.models import (
 
 @admin.register(DutyRate)
 class DutyRateAdmin(admin.ModelAdmin):
-    list_display = ("audience", "age_group", "unit", "max_value", "rate_percent", "rate_eur_cc", "min_rate_eur_cc")
+    list_display = (
+        "audience",
+        "age_group",
+        "unit",
+        "max_value",
+        "rate_percent",
+        "rate_eur_cc",
+        "min_rate_eur_cc",
+        "rate_eur_hp",
+        "min_rate_eur_hp",
+    )
     list_filter = ("audience", "age_group", "unit")
     search_fields = ("audience", "age_group")
 

@@ -41,6 +41,13 @@ class Audience(models.TextChoices):
     PASSENGER_CAR_PHYS = "PASSENGER_CAR_PHYS", "Passenger Car (Physical Person)"
     PASSENGER_CAR_JUR_BENZ = "PASSENGER_CAR_JUR_BENZ", "Passenger Car (Legal, Petrol)"
     PASSENGER_CAR_JUR_DIESEL = "PASSENGER_CAR_JUR_DIESEL", "Passenger Car (Legal, Diesel)"
+    # Non-car audiences (V4)
+    QUAD_PHYS = "QUAD_PHYS", "Quad (Physical Person)"
+    QUAD_JUR = "QUAD_JUR", "Quad (Legal)"
+    SNOWMOBILE_PHYS = "SNOWMOBILE_PHYS", "Snowmobile (Physical Person)"
+    SNOWMOBILE_JUR = "SNOWMOBILE_JUR", "Snowmobile (Legal)"
+    MOTORCYCLE_PHYS = "MOTORCYCLE_PHYS", "Motorcycle (Physical Person)"
+    MOTORCYCLE_JUR = "MOTORCYCLE_JUR", "Motorcycle (Legal)"
 
 
 class AgeGroup(models.TextChoices):
@@ -55,6 +62,9 @@ class DutyUnit(models.TextChoices):
     EUR_CC = "eur_cc", "EUR per cc"
     PERCENT = "percent", "% of price"
     VALUE = "value", "Price bracket (EUR)"
+    # HP-based for non-car
+    EUR_HP = "eur_hp", "EUR per hp"
+    PERCENT_HP = "percent_hp", "% of price (hp bracket/min in EUR/hp)"
 
 
 class UtilFeeKind(models.TextChoices):

@@ -11,6 +11,12 @@ if TYPE_CHECKING:  # pragma: no cover - type-only import
 
 from api.calculator.serializers import EstimateRequestSerializer, EstimateResponseSerializer
 from api.calculator.services import CalculatorService, EstimateInput, get_default_currency_provider
+from api.calculator.choices import (
+    Currency as CurrencyChoices,
+    VehicleType as VehicleTypeChoices,
+    EngineType as EngineTypeChoices,
+    AgeKey as AgeKeyChoices,
+)
 
 
 class EstimateView(APIView):
@@ -32,12 +38,12 @@ class EstimateView(APIView):
             result = calculator.estimate(
                 EstimateInput(
                     price=data["price"],
-                    currency=data["currency"],
+                    currency=CurrencyChoices(data["currency"]),
                     engine_cc=data["engine_cc"],
                     hp=data["hp"],
-                    vehicle_type=data.get("vehicle_type", "car"),
-                    engine_type=data.get("engine_type", "Бензин"),
-                    age_key=data.get("age_key", "under_3"),
+                    vehicle_type=VehicleTypeChoices(data.get("vehicle_type", "car")),
+                    engine_type=EngineTypeChoices(data.get("engine_type", "Бензин")),
+                    age_key=AgeKeyChoices(data.get("age_key", "under_3")),
                     is_jur=data.get("is_jur", False),
                     is_personal_use=data.get("is_personal_use"),
                     dvs_hp=data.get("dvs_hp"),

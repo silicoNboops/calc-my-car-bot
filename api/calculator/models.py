@@ -17,6 +17,9 @@ class DutyRate(models.Model):
     rate_percent = models.FloatField(null=True, blank=True)
     rate_eur_cc = models.FloatField(null=True, blank=True)
     min_rate_eur_cc = models.FloatField(null=True, blank=True)
+    # HP-based (for non-car audiences)
+    rate_eur_hp = models.FloatField(null=True, blank=True)
+    min_rate_eur_hp = models.FloatField(null=True, blank=True)
 
     class Meta:
         indexes = [
@@ -29,11 +32,30 @@ class DutyRate(models.Model):
                         models.Q(unit=DutyUnit.EUR_CC)
                         & models.Q(rate_eur_cc__isnull=False)
                         & models.Q(rate_percent__isnull=True)
+                        & models.Q(rate_eur_hp__isnull=True)
+                        & models.Q(min_rate_eur_hp__isnull=True)
+                    )
+                    |
+                    (
+                        models.Q(unit=DutyUnit.EUR_HP)
+                        & models.Q(rate_eur_hp__isnull=False)
+                        & models.Q(rate_percent__isnull=True)
+                        & models.Q(rate_eur_cc__isnull=True)
+                        & models.Q(min_rate_eur_cc__isnull=True)
                     )
                     |
                     (
                         models.Q(unit__in=[DutyUnit.PERCENT, DutyUnit.VALUE])
                         & models.Q(rate_percent__isnull=False)
+                        & models.Q(rate_eur_cc__isnull=True)
+                        & models.Q(rate_eur_hp__isnull=True)
+                    )
+                    |
+                    (
+                        models.Q(unit=DutyUnit.PERCENT_HP)
+                        & models.Q(rate_percent__isnull=False)
+                        & models.Q(rate_eur_cc__isnull=True)
+                        & models.Q(rate_eur_hp__isnull=True)
                     )
                 ),
                 name="duty_rate_valid_combination",

@@ -198,7 +198,7 @@ def test_ev_phys_under3_basic_v3_rules() -> None:
 
 @pytest.mark.django_db()
 def test_hybrid_parallel_jur_over5_min_rule() -> None:
-    """Юрлицо, гибрид(паралл), 5-7 лет: duty = max(0.18*price, 1.20*cc)."""
+    """Юрлицо, гибрид(паралл), 5-7 лет: v4 — гибрид считается как бензин (duty совпадает)."""
     client = APIClient()
     payload = {
         "price": 10000.0,  # EUR
@@ -214,8 +214,12 @@ def test_hybrid_parallel_jur_over5_min_rule() -> None:
     resp = client.post(reverse("calculator:estimate"), data=payload, format="json")
     assert resp.status_code == status.HTTP_200_OK, resp.content
     data = resp.json()
-    # duty_eur = max(0.18*10000, 1.20*1800) = max(1800, 2160) = 2160
-    assert pytest.approx(data["duty_eur"], rel=1e-6) == 2160.0
+    # Сравниваем с бензином по тем же входам
+    payload_benz = {**payload, "engine_type": "Бензин"}
+    resp_benz = client.post(reverse("calculator:estimate"), data=payload_benz, format="json")
+    assert resp_benz.status_code == status.HTTP_200_OK, resp_benz.content
+    data_benz = resp_benz.json()
+    assert pytest.approx(data["duty_eur"], rel=1e-6) == data_benz["duty_eur"]
     # util_fee коммерческий гибрид старше 3 лет: 20_000 * 2.84 = 56800
     assert pytest.approx(data["util_fee"], rel=1e-6) == 56800.0
     # accise по hp=dvs_hp=80 в первой ступени (0 руб/лс) -> 0
@@ -226,7 +230,7 @@ def test_hybrid_parallel_jur_over5_min_rule() -> None:
 
 @pytest.mark.django_db()
 def test_ev_phys_over5_rules() -> None:
-    """Физлицо, электро, >=3 лет: duty = 1 EUR/см³; VAT=0; accise=0; util=5200; customs_fee — по таблице."""
+    """Физлицо, электро, >=3 лет (v4 по умолчанию): duty = 15% от цены; VAT=0; accise=0; util=5200; customs_fee — по таблице."""
     client = APIClient()
     payload = {
         "price": 10000.0,
@@ -241,8 +245,8 @@ def test_ev_phys_over5_rules() -> None:
     resp = client.post(reverse("calculator:estimate"), data=payload, format="json")
     assert resp.status_code == status.HTTP_200_OK, resp.content
     data = resp.json()
-    # duty_eur = 1 * 2000
-    assert pytest.approx(data["duty_eur"], rel=1e-6) == 2000.0
+    # duty_eur = 15% от 10000 = 1500
+    assert pytest.approx(data["duty_eur"], rel=1e-6) == 1500.0
     # util_fee = 5200 (старше 3 лет для ФЛ)
     assert pytest.approx(data["util_fee"], rel=1e-6) == 5200.0
     assert data["accise_rub"] == 0.0
@@ -476,7 +480,7 @@ def test_serializer_forbids_ev_on_non_car() -> None:
 
 
 @pytest.mark.django_db()
-def test_quad_duty_new_30_percent_with_min() -> None:
+def test_v4_quad_phys_under3_25_percent_with_min_per_hp() -> None:
     client = APIClient()
     payload = {
         "price": 5000.0,  # EUR
@@ -492,12 +496,14 @@ def test_quad_duty_new_30_percent_with_min() -> None:
     resp = client.post(reverse("calculator:estimate"), data=payload, format="json")
     assert resp.status_code == status.HTTP_200_OK, resp.content
     data = resp.json()
-    expected = max(0.30 * payload["price"], 1.2 * payload["engine_cc"])  # in EUR
+    # V4: ФЛ <3 лет: 25% от цены, но не менее {<=50:1, >50:2} EUR/л.с.
+    min_per_hp = 1.0 if payload["hp"] <= 50 else 2.0
+    expected = max(0.25 * payload["price"], min_per_hp * payload["hp"])  # in EUR
     assert pytest.approx(data["duty_eur"], rel=1e-6) == expected
 
 
 @pytest.mark.django_db()
-def test_snowmobile_duty_5_percent_no_min() -> None:
+def test_v4_snowmobile_jur_under3_10_percent_no_min() -> None:
     client = APIClient()
     payload = {
         "price": 10000.0,
@@ -513,12 +519,13 @@ def test_snowmobile_duty_5_percent_no_min() -> None:
     resp = client.post(reverse("calculator:estimate"), data=payload, format="json")
     assert resp.status_code == status.HTTP_200_OK, resp.content
     data = resp.json()
-    expected = 0.05 * payload["price"]
+    # V4: ЮЛ <3 лет: 10% без минималки по л.с.
+    expected = 0.10 * payload["price"]
     assert pytest.approx(data["duty_eur"], rel=1e-6) == expected
 
 
 @pytest.mark.django_db()
-def test_motorcycle_phys_personal_min_0_5() -> None:
+def test_v4_motorcycle_phys_under3_progressive_min_by_cc() -> None:
     client = APIClient()
     payload = {
         "price": 1000.0,
@@ -534,12 +541,15 @@ def test_motorcycle_phys_personal_min_0_5() -> None:
     resp = client.post(reverse("calculator:estimate"), data=payload, format="json")
     assert resp.status_code == status.HTTP_200_OK, resp.content
     data = resp.json()
-    expected = max(0.15 * payload["price"], 0.5 * payload["engine_cc"])  # expect 1000 EUR from min
+    # V4: ФЛ <3 лет: зависят от объёма (cc):
+    #   <=125: 10% мин 0.8; <=500: 15% мин 1.0; <=800: 20% мин 1.2; >800: 20% мин 1.5
+    # Для 2000 cc -> >800: rate=20%, min=1.5 EUR/cc -> max(0.2*1000=200, 1.5*2000=3000) = 3000
+    expected = 3000.0
     assert pytest.approx(data["duty_eur"], rel=1e-6) == expected
 
 
 @pytest.mark.django_db()
-def test_motorcycle_commercial_min_0_8() -> None:
+def test_v4_motorcycle_jur_under3_percent_6_no_min() -> None:
     client = APIClient()
     payload = {
         "price": 1000.0,
@@ -555,5 +565,6 @@ def test_motorcycle_commercial_min_0_8() -> None:
     resp = client.post(reverse("calculator:estimate"), data=payload, format="json")
     assert resp.status_code == status.HTTP_200_OK, resp.content
     data = resp.json()
-    expected = max(0.15 * payload["price"], 0.8 * payload["engine_cc"])  # expect 1600 EUR from min
+    # V4: ЮЛ <3 лет: 6% от цены, без минималки по см³
+    expected = 0.06 * payload["price"]
     assert pytest.approx(data["duty_eur"], rel=1e-6) == expected
