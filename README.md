@@ -190,7 +190,10 @@ By following this guide and utilizing the advanced features, you'll be able to s
   - `USE_FIXED_CURRENCY_PROVIDER=true` — фиксированные курсы (CI/оффлайн).
   - Иначе: ЦБ РФ, параметры в Django settings: `CBR_URL`, `CBR_CACHE_TTL`.
 
-См. также: [Сопоставление v3 → API](docs/V3_TO_API_MAPPING.md).
+См. также:
+
+- [Сопоставление v3 → API](docs/V3_TO_API_MAPPING.md)
+- [Отличия v4 → API (дельта к v3)](docs/V4_TO_API_MAPPING.md)
 
 ## Тесты (локально)
 
