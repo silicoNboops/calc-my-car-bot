@@ -29,6 +29,27 @@ docker compose exec \
   --version-tag 2025_08_16
 ```
 
+## Поддержка V4 единиц измерения (HP)
+
+Команда поддерживает загрузку новых полей для V4 не‑авто ставок в модели `DutyRate`:
+- `rate_eur_hp`
+- `min_rate_eur_hp`
+
+Также поддерживаются новые единицы измерения: `EUR_HP`, `PERCENT_HP`.
+
+## Использование в тестах
+
+Для детерминированных тестов ставки загружаются через фикстуру pytest (один раз на сессию):
+
+```python
+@pytest.fixture(autouse=True, scope="session")
+def _seed_customs_rates(django_db_setup, django_db_blocker):
+    with django_db_blocker.unblock():
+        call_command("seed_customs_rates", "--replace", "--path", "api/calculator/fixtures")
+```
+
+Например, `tests/unit/test_v4_non_car_duty.py` использует такую фикстуру для ставок V4 не‑авто.
+
 ## Формат JSON
 
 Ожидается объединяемая структура (ключи опциональны, кроме массивов, которые могут быть пустыми):
