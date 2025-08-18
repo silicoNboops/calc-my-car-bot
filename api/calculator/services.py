@@ -321,10 +321,12 @@ class CustomsCalculator:
         # util_base хранится в Settings (fallback к 20000.0 при отсутствии)
         util_base = float(getattr(self.settings, "util_base", 20000.0) or 20000.0)
         if not is_commercial and vehicle_type == VehicleTypeChoices.CAR:
+            # Берём детерминированно запись с max_cc IS NULL из боевых фикстур
+            # (избегаем влияния шаблонных фикстур и сортировки NULL в разных СУБД)
             row = (
-                self.util_fees.filter(kind=UtilFeeKind.PERSONAL_NEW).first()
+                self.util_fees.filter(kind=UtilFeeKind.PERSONAL_NEW, max_cc__isnull=True).first()
                 if age_key == AgeKeyChoices.UNDER_3
-                else self.util_fees.filter(kind=UtilFeeKind.PERSONAL_OLD).first()
+                else self.util_fees.filter(kind=UtilFeeKind.PERSONAL_OLD, max_cc__isnull=True).first()
             )
             coeff = float(getattr(row, "coeff", 0.0))
             return util_base * coeff
