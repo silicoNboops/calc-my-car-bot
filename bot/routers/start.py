@@ -47,13 +47,38 @@ async def handle_start_command(message: Message, state: FSMContext) -> None:
         "first_name": first_name,
         "last_name": last_name,
         "email": "",
+        "telegram_id": tg.id,
     }
     logger.info("/start юзер данные епта: %s", payload)
 
-    _, is_new = await User.objects.aget_or_create(
-        pk=message.from_user.id,
-        defaults=payload,
-    )
+    # 1) Нормальный путь: ищем по telegram_id
+    try:
+        _ = await User.objects.aget(telegram_id=tg.id)
+        is_new = False
+    except User.DoesNotExist:
+        # 2) Бэкап: если раньше юзер создавался с pk == telegram_id, то мигрируем в новое поле
+        try:
+            legacy = await User.objects.aget(pk=tg.id)
+            # Обновим необходимые поля и проставим telegram_id
+            await User.objects.filter(pk=legacy.pk).aupdate(
+                telegram_id=tg.id,
+                username=legacy.username or username,
+                first_name=legacy.first_name or first_name,
+                last_name=legacy.last_name or last_name,
+                email=legacy.email or "",
+            )
+            is_new = False
+        except User.DoesNotExist:
+            # 3) Создаем нового по telegram_id
+            _, is_new = await User.objects.aget_or_create(
+                telegram_id=tg.id,
+                defaults={
+                    "username": username,
+                    "first_name": first_name,
+                    "last_name": last_name,
+                    "email": "",
+                },
+            )
 
     base = "Вас приветствует ChinaMotorsBot!"
     extra = (
