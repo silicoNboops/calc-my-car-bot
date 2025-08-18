@@ -182,10 +182,12 @@ By following this guide and utilizing the advanced features, you'll be able to s
 
 ---
 
-## Калькулятор v3 — ключевые изменения
+## Калькулятор — основные правила (v4 по умолчанию)
 
 - Таможенный сбор всегда по таблице `CustomsFee` (ПП РФ №1637), без фиксированных 500 ₽ для ФЛ.
 - Акциз — только для легковых (`vehicle_type == "car"`); для прочих ТС (quad/snowmobile/motorcycle) — 0.
+- EV (легковые): пошлина всегда 15% от стоимости (для ФЛ/ЮЛ и любого возраста); акциз всегда 0.
+- Гибриды (легковые, ЮЛ): считаются «как бензин» по таблицам `DutyRate`.
 - Провайдер валют выбирается через `get_default_currency_provider()`:
   - `USE_FIXED_CURRENCY_PROVIDER=true` — фиксированные курсы (CI/оффлайн).
   - Иначе: ЦБ РФ, параметры в Django settings: `CBR_URL`, `CBR_CACHE_TTL`.
