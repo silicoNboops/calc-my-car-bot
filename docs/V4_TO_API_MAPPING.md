@@ -30,6 +30,7 @@
 
 - **Таможенный сбор**
   - v4: по таблице ПП РФ №1637 — реализовано в `CustomsFee`.
+  - Версионированная фикстура V4 non‑car (`api/calculator/fixtures/customs_rates_v4_noncar_2025_08_17.json`) содержит блок `customs_fees`, идентичный таблице `CUSTOMS_FEES` в TS.
 
 ## Ссылки на код
 - `api/calculator/services.py`:
