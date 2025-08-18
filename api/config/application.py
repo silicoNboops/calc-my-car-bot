@@ -29,6 +29,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.locale.LocaleMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -63,9 +64,15 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "api.web.wsgi.application"
 
-LANGUAGE_CODE = getenv("LANGUAGE_CODE", "en-us")
+LANGUAGE_CODE = getenv("LANGUAGE_CODE", "ru")
 
 USE_TZ = True
 TIME_ZONE = getenv("TIME_ZONE", "UTC")
 
 USE_I18N = True
+
+# Supported UI languages
+LANGUAGES = [
+    ("ru", "Russian"),
+    ("en", "English"),
+]
