@@ -58,7 +58,7 @@ router = Router()
 
 def _format_calc_result(res) -> str:  # type: ignore[no-untyped-def]
     return (
-        "Итог расчёта:\n"
+        "🧮 Итог расчёта:\n"
         f"Цена (RUB): <b>{fmt_money(res.price_rub)}</b>\n"
         f"Цена (EUR): <b>{fmt_money(res.price_eur)}</b>\n"
         f"Пошлина (EUR): <b>{fmt_money(res.duty_eur)}</b>\n"
@@ -71,7 +71,7 @@ def _format_calc_result(res) -> str:  # type: ignore[no-untyped-def]
     )
 
 
-def _estimate_sync(payload: dict) -> tuple[str, dict[str, float]]:
+def _estimate_sync(payload: dict) -> tuple[str, dict[str, float], float]:
     """Синхронный расчёт через CalculatorService, в стиле /calc."""
     provider = get_default_currency_provider()
     service = CalculatorService(currency_provider=provider)
@@ -91,7 +91,7 @@ def _estimate_sync(payload: dict) -> tuple[str, dict[str, float]]:
         # Если не удалось привести — пусть выбросится позже в расчёте
         pass
     res = calc.estimate(EstimateInput(**data))
-    return _format_calc_result(res), provider.get_rates()
+    return _format_calc_result(res), provider.get_rates(), float(res.subtotal_customs)
 
 
 def _get_company_commission_rub() -> float:
@@ -336,7 +336,7 @@ _calc_accise(self, hp, is_commercial, engine_type, ...)
         "vehicle_type": str(data.get("vehicle_type", "car")),
     }
     try:
-        result_text, rates = await sync_to_async(_estimate_sync)(payload)
+        result_text, rates, subtotal_customs = await sync_to_async(_estimate_sync)(payload)
     except Exception as e:  # noqa: BLE001
         await call.message.edit_text(f"Ошибка расчёта: {e}")
         await call.answer()
@@ -349,7 +349,7 @@ _calc_accise(self, hp, is_commercial, engine_type, ...)
     try:
         if cur_code and cur_code != "RUB" and cur_code in rates and "RUB" in rates:
             rub_per_cur = float(rates[cur_code])
-            fx_line = f"\nРасчёты произведены на актуальном курсе: 1 {cur_code} = {rub_per_cur:.4f} ₽\n"
+            fx_line = f"\n<i>Расчёты произведены на актуальном курсе: <b>1 {cur_code} = {rub_per_cur:.4f} ₽</b></i>\n"
     except Exception:
         fx_line = ""
 
@@ -359,11 +359,24 @@ _calc_accise(self, hp, is_commercial, engine_type, ...)
         commission_rub = await sync_to_async(_get_company_commission_rub)()
         if commission_rub > 0:
             broker_line = (
-                "\nУслуги брокера:\n"
+                "\n💼 Услуги брокера:\n"
                 f"Комиссия компании (RUB): <b>💼 {fmt_money(commission_rub)}</b>\n"
             )
     except Exception:
         broker_line = ""
+
+    # Итог с учётом услуг брокера
+    itog_line = ""
+    try:
+        if broker_line:
+            grand_total = float(subtotal_customs) + float(commission_rub)
+            itog_line = (
+                "\n✅ Итог:\n"
+                f"Всего за таможню (RUB): <b>{fmt_money(subtotal_customs)}</b>\n"
+                f"С услугами брокера (RUB): <b>{fmt_money(grand_total)}</b>\n"
+            )
+    except Exception:
+        itog_line = ""
 
     header = format_selection_header(
         {
@@ -379,7 +392,7 @@ _calc_accise(self, hp, is_commercial, engine_type, ...)
         age_title=age_title,
     )
 
-    final_text = header + result_text + broker_line + fx_line + CONTACT_LINE
+    final_text = header + result_text + broker_line + itog_line + fx_line + CONTACT_LINE
     await _edit_or_send(call.message, final_text, reply_markup=None)
     await call.answer()
     # Сбрасываем состояние и данные визарда
