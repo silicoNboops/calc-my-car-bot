@@ -72,7 +72,7 @@ def _parse_calc_args(text: str) -> dict | str:
 
 def _format_result(res) -> str:  # type: ignore[no-untyped-def]
     return (
-        "Итог расчёта:\n"
+        "🧮 Итог расчёта:\n"
         f"Цена (RUB): <b>{fmt_money(res.price_rub)}</b>\n"
         f"Цена (EUR): <b>{fmt_money(res.price_eur)}</b>\n"
         f"Пошлина (EUR): <b>{fmt_money(res.duty_eur)}</b>\n"

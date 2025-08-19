@@ -22,6 +22,11 @@ from api.config.storage import (
 
 logger = logging.getLogger(__name__)
 
+# Admin branding (Russian)
+admin.site.site_header = f"{settings.PROJECT_VERBOSE_NAME} — админка"
+admin.site.site_title = "Админ-панель"
+admin.site.index_title = "Управление данными"
+
 _swagger_urlpatterns = [
     path(
         "api/v1/schema/",

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 from aiogram import Router, F
@@ -7,10 +8,10 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 
 from api.user.models import User
-from bot.utils.fsm import reset_wizard
-from bot.keyboards.start import inline_start_menu_kb
 from bot.keyboards.calculator import vehicle_type_kb
+from bot.keyboards.start import inline_start_menu_kb
 from bot.states import CalculatorState
+from bot.utils.fsm import reset_wizard
 from bot.utils.strings import (
     PROMPT_CHOOSE_VEHICLE_TYPE,
     RESET_MESSAGE,
@@ -22,6 +23,7 @@ if TYPE_CHECKING:
     from aiogram.types import Message, CallbackQuery
 
 router = Router()
+logger = logging.getLogger(__name__)
 
 
 @router.message(Command(commands=["start"]))
@@ -32,12 +34,31 @@ async def handle_start_command(message: Message, state: FSMContext) -> None:
     # Сброс состояния визарда при входе в /start
     await reset_wizard(state)
 
+    # Безопасно нормализуем поля профиля TG: они могут быть None
+    tg = message.from_user
+    # username в Django уникален, поэтому при отсутствии ника используем id
+    # как безопасный fallback
+    username = tg.username or str(tg.id)
+    first_name = tg.first_name or ""
+    last_name = tg.last_name or ""
+
+    payload = {
+        "username": username,
+        "first_name": first_name,
+        "last_name": last_name,
+        "email": "",
+        "telegram_id": tg.id,
+    }
+    logger.info("/start юзер данные епта: %s", payload)
+
+    # Простой путь: создаем/получаем пользователя по telegram_id
     _, is_new = await User.objects.aget_or_create(
-        pk=message.from_user.id,
+        telegram_id=tg.id,
         defaults={
-            "username": message.from_user.username,
-            "first_name": message.from_user.first_name,
-            "last_name": message.from_user.last_name,
+            "username": username,
+            "first_name": first_name,
+            "last_name": last_name,
+            "email": "",
         },
     )
 

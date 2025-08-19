@@ -34,6 +34,25 @@ collectstatic:
 
 createsuperuser:
 	python manage.py createsuperuser --email "" --username admin
+	python manage.py init_admin_telegram_id
+
+# Seed customs rates (production-safe)
+seed.rates.dryrun.prod:
+	ENVIRONMENT=production python manage.py seed_customs_rates --path api/calculator/fixtures --version-tag legacy --dry-run
+	ENVIRONMENT=production python manage.py seed_customs_rates --path api/calculator/fixtures --version-tag 2025_08_17 --dry-run
+
+seed.rates.prod:
+	ENVIRONMENT=production python manage.py seed_customs_rates --path api/calculator/fixtures --version-tag legacy --replace
+	ENVIRONMENT=production python manage.py seed_customs_rates --path api/calculator/fixtures --version-tag 2025_08_17
+
+# Quick check of seeded rows
+check.rates:
+	python manage.py shell -c "from api.calculator.models import DutyRate, UtilFee, AcciseRate, CustomsFee, Settings; \
+	print('DutyRate', DutyRate.objects.count()); \
+	print('UtilFee', UtilFee.objects.count()); \
+	print('AcciseRate', AcciseRate.objects.count()); \
+	print('CustomsFee', CustomsFee.objects.count()); \
+	print('Settings', Settings.objects.count())"
 
 # Tests, linters & formatters
 fmt:
