@@ -372,7 +372,6 @@ _calc_accise(self, hp, is_commercial, engine_type, ...)
             grand_total = float(subtotal_customs) + float(commission_rub)
             itog_line = (
                 "\n✅ Итог:\n"
-                f"Всего за таможню (RUB): <b>{fmt_money(subtotal_customs)}</b>\n"
                 f"С услугами брокера (RUB): <b>{fmt_money(grand_total)}</b>\n"
             )
     except Exception:
