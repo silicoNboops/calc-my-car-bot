@@ -168,6 +168,8 @@ class Command(BaseCommand):
                 ])
 
             if merged["customs_fees"]:
+                # Refresh CustomsFee deterministically on every load
+                CustomsFee.objects.all().delete()
                 # Deduplicate by max_value_rub with last-file-wins policy and order ascending
                 dedup: dict[float, dict[str, Any]] = {}
                 for item in merged["customs_fees"]:
