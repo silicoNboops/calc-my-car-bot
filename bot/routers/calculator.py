@@ -15,6 +15,7 @@ from api.calculator.services import (
     EstimateInput,
     get_default_currency_provider,
 )
+from api.calculator.models import Settings
 from bot.keyboards.calculator import (
     VehicleTypeCD,
     CurrencyCD,
@@ -91,6 +92,19 @@ def _estimate_sync(payload: dict) -> tuple[str, dict[str, float]]:
         pass
     res = calc.estimate(EstimateInput(**data))
     return _format_calc_result(res), provider.get_rates()
+
+
+def _get_company_commission_rub() -> float:
+    """Возвращает комиссию компании в рублях из Settings.
+
+    Поле admin может храниться в тысячах (например, 69 => 69 000),
+    поэтому делаем мягкую нормализацию: если значение < 1000, умножаем на 1000.
+    """
+    s = Settings.objects.order_by("-updated_at").first()
+    raw = float(getattr(s, "company_commission_rub", 0.0) or 0.0)
+    if raw < 1000.0:
+        return raw * 1000.0
+    return raw
 
 
 async def _edit_or_send(
@@ -339,6 +353,18 @@ _calc_accise(self, hp, is_commercial, engine_type, ...)
     except Exception:
         fx_line = ""
 
+    # Блок услуг брокера (комиссия из Settings)
+    broker_line = ""
+    try:
+        commission_rub = await sync_to_async(_get_company_commission_rub)()
+        if commission_rub > 0:
+            broker_line = (
+                "\nУслуги брокера:\n"
+                f"Комиссия компании (RUB): <b>💼 {fmt_money(commission_rub)}</b>\n"
+            )
+    except Exception:
+        broker_line = ""
+
     header = format_selection_header(
         {
             "vehicle_title": vehicle_title,
@@ -353,7 +379,7 @@ _calc_accise(self, hp, is_commercial, engine_type, ...)
         age_title=age_title,
     )
 
-    final_text = header + result_text + fx_line + CONTACT_LINE
+    final_text = header + result_text + broker_line + fx_line + CONTACT_LINE
     await _edit_or_send(call.message, final_text, reply_markup=None)
     await call.answer()
     # Сбрасываем состояние и данные визарда
