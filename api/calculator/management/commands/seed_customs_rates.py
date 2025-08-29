@@ -168,12 +168,23 @@ class Command(BaseCommand):
                 ])
 
             if merged["customs_fees"]:
+                # Refresh CustomsFee deterministically on every load
+                CustomsFee.objects.all().delete()
+                # Deduplicate by max_value_rub with last-file-wins policy and order ascending
+                dedup: dict[float, dict[str, Any]] = {}
+                for item in merged["customs_fees"]:
+                    # use float key to normalize numeric types
+                    key = float(item["max_value_rub"])
+                    dedup[key] = item
+
+                ordered_items = [dedup[k] for k in sorted(dedup.keys())]
+
                 CustomsFee.objects.bulk_create([
                     CustomsFee(
-                        max_value_rub=item["max_value_rub"],
-                        fee_rub=item["fee_rub"],
+                        max_value_rub=it["max_value_rub"],
+                        fee_rub=it["fee_rub"],
                     )
-                    for item in merged["customs_fees"]
+                    for it in ordered_items
                 ])
 
         self.stdout.write(self.style.SUCCESS("Seed completed successfully."))
