@@ -6,16 +6,18 @@ from typing import TYPE_CHECKING
 from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
+from asgiref.sync import sync_to_async
 
+from api.calculator.services import get_default_currency_provider
 from api.user.models import User
 from bot.keyboards.calculator import vehicle_type_kb
 from bot.keyboards.start import inline_start_menu_kb
 from bot.states import CalculatorState
+from bot.utils.formatting import format_rates_message
 from bot.utils.fsm import reset_wizard
 from bot.utils.strings import (
     PROMPT_CHOOSE_VEHICLE_TYPE,
     RESET_MESSAGE,
-    START_RATES_SOON,
     START_LEAD_SOON,
 )
 
@@ -105,7 +107,17 @@ async def handle_cancel_command(message: Message, state: FSMContext) -> None:
 
 @router.callback_query(F.data == "start:rates")
 async def cb_start_rates(call: CallbackQuery) -> None:
-    await call.answer(START_RATES_SOON, show_alert=True)
+    try:
+        provider = get_default_currency_provider()
+        rates = await sync_to_async(provider.get_rates)()
+        text = format_rates_message(rates)
+        await call.message.answer(text)
+        await call.answer()
+    except Exception:
+        await call.answer(
+            "Не удалось получить курсы. Попробуйте позже.",
+            show_alert=True
+        )
 
 
 @router.callback_query(F.data == "start:lead")
