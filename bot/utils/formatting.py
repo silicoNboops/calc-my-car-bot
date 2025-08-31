@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from datetime import datetime
 from typing import Optional
 
 from bot.keyboards.calculator import (
@@ -9,6 +10,7 @@ from bot.keyboards.calculator import (
     format_engine_type_title,
     format_importer_kind_title,
     format_vehicle_title,
+    get_currency_flag,
 )
 
 
@@ -30,20 +32,25 @@ def fmt_money(value: float) -> str:
 
 
 def format_rates_message(rates: dict[str, float]) -> str:
-    """Строит человекочитаемое сообщение с курсами валют.
+    """Строит сообщение с курсами валют в формате другого бота.
 
-    Ожидает словарь вида {"RUB": 1.0, "EUR": 100.0, ...} как у CurrencyProvider.
-    Показывает ключевые валюты в фиксированном порядке.
+    Заголовок: "Курсы валют на DD/MM/YYYY: (ЦБ РФ)"
+    Строки: "<флаг> CODE => VALUE"; для JPY — 6 знаков после запятой, иначе 4.
+    Для USD используем символ "💲" вместо флага.
     """
-    order = ("EUR", "USD", "CNY", "JPY", "KRW")
-    lines: list[str] = ["Курсы валют (ЦБ РФ):"]
+    order = ("EUR", "USD", "CNY", "KRW", "JPY")
+    today = datetime.now().strftime("%d/%m/%Y")
+    lines: list[str] = [f"Курсы валют на {today}: (ЦБ РФ)"]
     for code in order:
         try:
             v = float(rates.get(code, 0.0))
         except Exception:
             v = 0.0
-        if v:
-            lines.append(f"1 {code} = {v:.4f} ₽")
+        if not v:
+            continue
+        flag = "💲" if code == "USD" else get_currency_flag(code)
+        precision = 6 if code == "JPY" else 4
+        lines.append(f"{flag} {code} => {v:.{precision}f}")
     return "\n".join(lines)
 
 
