@@ -40,7 +40,9 @@ def format_rates_message(rates: dict[str, float]) -> str:
     """
     order = ("EUR", "USD", "CNY", "KRW", "JPY")
     today = datetime.now().strftime("%d/%m/%Y")
-    lines: list[str] = [f"Курсы валют на {today}: (ЦБ РФ)"]
+    # Первая строка — жирным целиком, часть (ЦБ РФ) дополнительно курсивом
+    header = f"<b>Курсы валют на {today}: (<i>ЦБ РФ</i>)</b>"
+    lines: list[str] = [header, ""]  # пустая строка после заголовка
     for code in order:
         try:
             v = float(rates.get(code, 0.0))
@@ -50,7 +52,7 @@ def format_rates_message(rates: dict[str, float]) -> str:
             continue
         flag = "💲" if code == "USD" else get_currency_flag(code)
         precision = 6 if code == "JPY" else 4
-        lines.append(f"{flag} {code} => {v:.{precision}f}")
+        lines.append(f"{flag} {code} => {v:.{precision}f} 🇷🇺 RUB")
     return "\n".join(lines)
 
 
