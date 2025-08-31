@@ -41,7 +41,7 @@ def format_rates_message(rates: dict[str, float]) -> str:
     order = ("EUR", "USD", "CNY", "KRW", "JPY")
     today = datetime.now().strftime("%d/%m/%Y")
     # Первая строка — жирным целиком, часть (ЦБ РФ) дополнительно курсивом
-    header = f"<b>Курсы валют на {today}: (<i>ЦБ РФ</i>)</b>"
+    header = f"<b>Курсы валют на {today} (<i>ЦБ РФ</i>):</b>"
     lines: list[str] = [header, ""]  # пустая строка после заголовка
     for code in order:
         try:
