@@ -40,7 +40,6 @@ class VehicleTypeCD(CallbackData, prefix="veh"):
 
 
 def vehicle_type_kb() -> InlineKeyboardMarkup:
-    
     builder = InlineKeyboardBuilder()
     # Строим кнопки из единого источника истины — Django TextChoices
     for value, label in VehicleType.choices:
@@ -78,6 +77,11 @@ def format_currency_title(code: str) -> str:
     title = _CURRENCY_TITLES_RU.get(code, dict(Currency.choices).get(code, code))
     flag = _CURRENCY_FLAGS.get(code, "")
     return f"{flag} {title}".strip()
+
+
+# Публичный хелпер для получения флажка по коду валюты
+def get_currency_flag(code: str) -> str:
+    return _CURRENCY_FLAGS.get(code, "")
 
 
 # ROLE (кто ввозит): физ/юр
