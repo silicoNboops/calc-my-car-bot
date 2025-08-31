@@ -29,6 +29,24 @@ def fmt_money(value: float) -> str:
     return s
 
 
+def format_rates_message(rates: dict[str, float]) -> str:
+    """Строит человекочитаемое сообщение с курсами валют.
+
+    Ожидает словарь вида {"RUB": 1.0, "EUR": 100.0, ...} как у CurrencyProvider.
+    Показывает ключевые валюты в фиксированном порядке.
+    """
+    order = ("EUR", "USD", "CNY", "JPY", "KRW")
+    lines: list[str] = ["Курсы валют (ЦБ РФ):"]
+    for code in order:
+        try:
+            v = float(rates.get(code, 0.0))
+        except Exception:
+            v = 0.0
+        if v:
+            lines.append(f"1 {code} = {v:.4f} ₽")
+    return "\n".join(lines)
+
+
 def format_selection_header(data: dict, *, age_title: Optional[str] = None) -> str:
     """Строит заголовок выбора для визарда, добавляя только заполненные пункты.
 
