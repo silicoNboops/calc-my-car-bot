@@ -111,7 +111,7 @@ async def cb_start_rates(call: CallbackQuery) -> None:
         provider = get_default_currency_provider()
         rates = await sync_to_async(provider.get_rates)()
         text = format_rates_message(rates)
-        await call.message.answer(text)
+        await call.message.answer(text, parse_mode="HTML")
         await call.answer()
     except Exception:
         await call.answer(
