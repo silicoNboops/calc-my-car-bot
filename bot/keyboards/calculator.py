@@ -75,7 +75,7 @@ def format_vehicle_title(value: str) -> str:
 
 def format_currency_title(code: str) -> str:
     title = _CURRENCY_TITLES_RU.get(code, dict(Currency.choices).get(code, code))
-    flag = _CURRENCY_FLAGS.get(code, "")
+    flag = get_currency_flag(code)
     return f"{flag} {title}".strip()
 
 
