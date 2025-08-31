@@ -35,7 +35,7 @@ api:
 - `api/calculator/services.py` —
   - `CbrfCurrencyProvider` читает `settings.CBR_URL`/`settings.CBR_CACHE_TTL` по умолчанию.
   - `get_default_currency_provider()` читает `settings.USE_FIXED_CURRENCY_PROVIDER`.
-- `api/calculator/views.py` и `bot/handlers.py` используют `get_default_currency_provider()`.
+- `bot/routers/calculator_command.py`, `bot/routers/calculator.py` и `bot/routers/start.py` используют `get_default_currency_provider()`.
 
 ## Примеры
 
