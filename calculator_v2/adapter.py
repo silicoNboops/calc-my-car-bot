@@ -24,7 +24,6 @@ _AGE_KEY_TO_YEARS: Dict[str, int] = {
     "3_to_5": 4,
     "5_to_7": 6,
     "over_7": 8,
-    "over_5": 6,  # исторический ключ — принимаем как 5–7
 }
 
 # Значения из api/calculator/choices.py::EngineType (TextChoices, RU строки)
@@ -93,7 +92,7 @@ def map_bot_payload_to_v6_spec(payload: Dict[str, Any]) -> VehicleSpec:
             "engine_cc": int,
             "hp": int,  # может быть 0 в текущей версии визарда
             "engine_type": str,  # RU: "Бензин"/"Дизель"/"Электро"/"Гибрид(послед)"/"Гибрид(паралл)"
-            "age_key": str,  # "under_3" | "3_to_5" | "5_to_7" | "over_7" | "over_5"
+            "age_key": str,  # "under_3" | "3_to_5" | "5_to_7" | "over_7"
             "is_jur": bool,
             "is_personal_use": bool | None,
             "vehicle_type": str,  # "car" | "quad" | "snowmobile" | "motorcycle"
