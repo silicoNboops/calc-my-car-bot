@@ -92,5 +92,18 @@ test-sqlite:
 test-sqlite-cov:
 	USE_TEST_DB=1 TEST_DATABASE_URL=sqlite://:memory: python -m pytest
 
+# Run tests against Postgres inside Docker network (connects to service `db`).
+# Requires POSTGRES_USER/POSTGRES_PASSWORD/POSTGRES_DB in environment (e.g., via `--env-file .env`).
+test-pg:
+	USE_TEST_DB=1 \
+	TEST_DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB} \
+	python -m pytest -q
+
+# Same as test-pg but with coverage thresholds from pyproject
+test-pg-cov:
+	USE_TEST_DB=1 \
+	TEST_DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB} \
+	python -m pytest
+
 mypy:
 	python -m mypy .
