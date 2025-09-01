@@ -16,6 +16,10 @@ CONTACT_LINE = "\nСвяжитесь с нами: <b>@jonnyfase</b>"
 RESET_MESSAGE = "Сбросил состояние. Можем начать заново: нажмите 'Калькулятор' или введите /calc"
 START_LEAD_SOON = "Форму заявки скоро добавлю"
 
+# Заявки
+LEAD_NAME_PROMPT = "📝 Создание заявки\n\nВведите ваше имя (например, Иван):"
+LEAD_PHONE_PROMPT = "Введите ваш номер телефона (например, 71234567890 или 81234567890):"
+
 # /calc команда — подсказки/ошибки
 CALC_USAGE_EXAMPLE = "/calc 20000 EUR 1999 150 Бензин under_3 phys personal"
 CALC_USAGE_HELP = (

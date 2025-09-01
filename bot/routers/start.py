@@ -107,6 +107,4 @@ async def cb_start_rates(call: CallbackQuery) -> None:
         )
 
 
-@router.callback_query(F.data == "start:lead")
-async def cb_start_lead(call: CallbackQuery) -> None:
-    await call.answer(START_LEAD_SOON, show_alert=True)
+# Обработчик start:lead перенесен в bot/routers/lead.py
