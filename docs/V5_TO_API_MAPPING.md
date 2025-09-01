@@ -60,6 +60,20 @@
         - Серийный: `dvs_hp + electric_hp`.
         - Параллельный: `dvs_hp`, иначе `0.65 * hp`.
 
+    - Точные брекеты `AcciseRate` (руб/л.с.), источник: `api/calculator/fixtures/customs_rates_v5_2025_08_17.json` (
+      `accise_rates`):
+        - `max_hp ≤ 90` → `rate_rub_per_hp = 0`
+        - `max_hp ≤ 150` → `rate_rub_per_hp = 61`
+        - `max_hp ≤ 200` → `rate_rub_per_hp = 583`
+        - `max_hp ≤ 300` → `rate_rub_per_hp = 955`
+        - `max_hp ≤ 400` → `rate_rub_per_hp = 1628`
+        - `max_hp ≤ 500` → `rate_rub_per_hp = 1685`
+        - `max_hp = 1e18 (∞)` → `rate_rub_per_hp = 1740`
+
+    - Применение ставки из брекета: как в `api/calculator/services.py::_calc_accise()` — выбирается подходящий брекет по
+      `power_for_tax` и ставка `rate_rub_per_hp` умножается на всю мощность `power_for_tax` (ставка не «маржинальная по
+      сегментам»).
+
 - **НДС (VAT)**: метод `_calc_vat` — только для коммерции/юр: `(price_rub + duty_rub + accise_rub) * vat_rate`.
 
 - **Таможенный сбор**: метод `_calc_customs_fee` — по таблице `CustomsFee` (брекеты по цене в рублях).
