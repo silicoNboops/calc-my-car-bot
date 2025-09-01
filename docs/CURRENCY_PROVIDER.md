@@ -1,10 +1,12 @@
 # Конфигурация провайдера валют
 
-Провайдер курсов валют использует настройки из окружения и прокидывает их в Django settings через модуль `api/config/currency.py`.
+Провайдер курсов валют использует настройки из окружения и прокидывает их в Django settings через модуль
+`api/config/currency.py`.
 
 - `settings.CBR_URL` — URL источника курсов (по умолчанию: `https://www.cbr-xml-daily.ru/daily_json.js`).
 - `settings.CBR_CACHE_TTL` — TTL кэша в секундах (по умолчанию: `3600`).
-- `settings.USE_FIXED_CURRENCY_PROVIDER` — если `1`/`true`, принудительно включает фиксированный провайдер (удобно для CI/оффлайна).
+- `settings.USE_FIXED_CURRENCY_PROVIDER` — если `1`/`true`, принудительно включает фиксированный провайдер (удобно для
+  CI/оффлайна).
 
 Провайдер по умолчанию выбирается фабрикой `get_default_currency_provider()` из `api/calculator/services.py`.
 
@@ -33,9 +35,12 @@ api:
 
 - `api/config/currency.py` — читает ENV и экспортирует в `settings`.
 - `api/calculator/services.py` —
-  - `CbrfCurrencyProvider` читает `settings.CBR_URL`/`settings.CBR_CACHE_TTL` по умолчанию.
-  - `get_default_currency_provider()` читает `settings.USE_FIXED_CURRENCY_PROVIDER`.
-- `bot/routers/calculator_command.py`, `bot/routers/calculator.py` и `bot/routers/start.py` используют `get_default_currency_provider()`.
+    - `CbrfCurrencyProvider` читает `settings.CBR_URL`/`settings.CBR_CACHE_TTL` по умолчанию.
+    - `get_default_currency_provider()` читает `settings.USE_FIXED_CURRENCY_PROVIDER`.
+- `bot/routers/calculator_command.py`, `bot/routers/calculator.py` и `bot/routers/start.py` используют
+  `get_default_currency_provider()`.
+    - Сообщения с курсами (в т.ч. ежедневная рассылка) формируются через тот же провайдер и кэш: см.
+      `bot/utils/formatting.py::format_rates_message()` и `tasks/daily.py::send_daily_rates()`.
 
 ## Примеры
 
