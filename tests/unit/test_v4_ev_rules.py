@@ -8,7 +8,7 @@ from rest_framework.test import APIClient
 
 @pytest.mark.django_db()
 def test_v4_ev_phys_over5_duty_is_15_percent_no_min_cc() -> None:
-    """v4 по умолчанию: EV у физлица, >3 лет — duty = 15% от цены, без 1 EUR/см³."""
+    """v5: EV у физлица, >3 лет — duty = 15% от цены (без 1 EUR/см³), акциз по прогрессивной шкале."""
     client = APIClient()
     payload = {
         "price": 10000.0,  # EUR
@@ -25,14 +25,15 @@ def test_v4_ev_phys_over5_duty_is_15_percent_no_min_cc() -> None:
     data = resp.json()
     # duty_eur = 0.15 * 10000 = 1500
     assert pytest.approx(data["duty_eur"], rel=1e-6) == 1500.0
-    # VAT/Accise остаются 0 для личного использования
+    # VAT остаётся 0 для личного использования
     assert data["vat_rub"] == 0.0
-    assert data["accise_rub"] == 0.0
+    # v5: EV облагается акцизом: 150 л.с. попадает в брекет 61 руб/л.с. => 9150
+    assert pytest.approx(data["accise_rub"], rel=1e-6) == 9150.0
 
 
 @pytest.mark.django_db()
 def test_v4_ev_jur_accise_zero() -> None:
-    """v4 по умолчанию: EV у ЮЛ — акциз всегда 0."""
+    """v5: EV у ЮЛ — акциз по прогрессивной шкале (не 0)."""
     client = APIClient()
     payload = {
         "price": 12000.0,
@@ -47,6 +48,7 @@ def test_v4_ev_jur_accise_zero() -> None:
     resp = client.post(reverse("calculator:estimate"), data=payload, format="json")
     assert resp.status_code == status.HTTP_200_OK, resp.content
     data = resp.json()
-    assert data["accise_rub"] == 0.0
+    # v5: 200 л.с. попадает в брекет 583 руб/л.с. => 116600
+    assert pytest.approx(data["accise_rub"], rel=1e-6) == 116600.0
     # Для ЮЛ duty по-прежнему 15% от цены в EUR
     assert pytest.approx(data["duty_eur"], rel=1e-6) == 0.15 * payload["price"]
