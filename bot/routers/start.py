@@ -71,19 +71,6 @@ async def handle_start_command(message: Message, state: FSMContext) -> None:
     await message.answer(base + extra, reply_markup=inline_start_menu_kb())
 
 
-@router.message(Command(commands=["id"]))
-async def handle_id_command(message: Message, state: FSMContext) -> None:
-    if message.from_user is None:
-        return
-
-    # Сброс состояния визарда при запросе /id
-    await reset_wizard(state)
-
-    await message.answer(
-        f"User Id: <b>{message.from_user.id}</b>\nChat Id: <b>{message.chat.id}</b>",
-    )
-
-
 # Inline-кнопки стартового меню (заглушки)
 @router.callback_query(F.data == "start:calc")
 async def cb_start_calc(call: CallbackQuery, state: FSMContext) -> None:
