@@ -90,6 +90,7 @@ mypy:
 test:
 	python -m pytest
 
+# TODO сделать через точки а не дефисы ебаные. упростить
 # Run tests with in-memory SQLite (no Postgres required)
 test-sqlite:
 	USE_TEST_DB=1 TEST_DATABASE_URL=sqlite://:memory: python -m pytest -q
