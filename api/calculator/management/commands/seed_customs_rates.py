@@ -157,6 +157,10 @@ class Command(BaseCommand):
                 ])
 
             if merged["util_fees"]:
+                # Обновляем UtilFee детерминированно при каждом запуске,
+                # аналогично CustomsFee: очищаем таблицу и загружаем дедуплицированные данные.
+                UtilFee.objects.all().delete()
+
                 # Дедупликация по (kind, max_cc) с политикой last-file-wins и
                 # стабильным порядком
                 dedup_util: dict[tuple[str, float | None], dict[str, Any]] = {}
