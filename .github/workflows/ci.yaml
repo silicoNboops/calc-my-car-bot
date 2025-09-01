@@ -31,15 +31,15 @@ jobs:
           python -m pip install -U pip
           python -m pip install -r requirements-dev.txt
 
-      - name: Run linters
-        run: make lint
-
       - name: Run tests (SQLite in-memory, fixed currency provider)
         env:
           USE_TEST_DB: "1"
           TEST_DATABASE_URL: "sqlite://:memory:"
           USE_FIXED_CURRENCY_PROVIDER: "true"
         run: make test
+
+      - name: Run linters
+        run: make lint
 
   dependabot-auto-merge:
     name: 'Dependabot auto merge'
