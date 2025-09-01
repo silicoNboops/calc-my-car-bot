@@ -45,37 +45,22 @@ createsuperuser:
 	python manage.py init_admin_telegram_id
 
 # Seed customs rates (production-safe)
+.PHONY: seed.rates.dryrun.prod seed.rates.prod check.rates
 seed.rates.dryrun.prod:
-	bash -lc 'set -a; source .env; \
-		ENVIRONMENT=production docker compose run --rm \
+	docker compose --env-file .env run --rm \
 		-e ENVIRONMENT=production \
-		-e POSTGRES_USER \
-		-e POSTGRES_PASSWORD \
-		-e POSTGRES_DB \
-		api python manage.py seed_customs_rates --path api/calculator/fixtures --version-tag legacy --dry-run'
-	bash -lc 'set -a; source .env; \
-		ENVIRONMENT=production docker compose run --rm \
+		api python manage.py seed_customs_rates --path api/calculator/fixtures --version-tag legacy --dry-run
+	docker compose --env-file .env run --rm \
 		-e ENVIRONMENT=production \
-		-e POSTGRES_USER \
-		-e POSTGRES_PASSWORD \
-		-e POSTGRES_DB \
-		api python manage.py seed_customs_rates --path api/calculator/fixtures --version-tag 2025_08_17 --dry-run'
+		api python manage.py seed_customs_rates --path api/calculator/fixtures --version-tag 2025_08_17 --dry-run
 
 seed.rates.prod:
-	bash -lc 'set -a; source .env; \
-		ENVIRONMENT=production docker compose run --rm \
+	docker compose --env-file .env run --rm \
 		-e ENVIRONMENT=production \
-		-e POSTGRES_USER \
-		-e POSTGRES_PASSWORD \
-		-e POSTGRES_DB \
-		api python manage.py seed_customs_rates --path api/calculator/fixtures --version-tag legacy --replace'
-	bash -lc 'set -a; source .env; \
-		ENVIRONMENT=production docker compose run --rm \
+		api python manage.py seed_customs_rates --path api/calculator/fixtures --version-tag legacy --replace
+	docker compose --env-file .env run --rm \
 		-e ENVIRONMENT=production \
-		-e POSTGRES_USER \
-		-e POSTGRES_PASSWORD \
-		-e POSTGRES_DB \
-		api python manage.py seed_customs_rates --path api/calculator/fixtures --version-tag 2025_08_17'
+		api python manage.py seed_customs_rates --path api/calculator/fixtures --version-tag 2025_08_17
 
 # Quick check of seeded rows
 check.rates:
