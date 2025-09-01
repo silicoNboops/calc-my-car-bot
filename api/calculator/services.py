@@ -208,7 +208,8 @@ class CustomsCalculator:
         else:
             g = AgeGroup.UNDER_3 if age_key == AgeKeyChoices.UNDER_3 else AgeGroup.OVER_5
             if g == AgeGroup.UNDER_3:
-                rows = list(self.duty_rates.filter(audience=Audience.SNOWMOBILE_JUR, age_group=g, unit=DutyUnit.PERCENT))
+                rows = list(
+                    self.duty_rates.filter(audience=Audience.SNOWMOBILE_JUR, age_group=g, unit=DutyUnit.PERCENT))
                 if not rows:
                     return 0.0
                 rate_percent = float(rows[0].rate_percent or 0.0)
@@ -230,8 +231,10 @@ class CustomsCalculator:
         if not is_jur:
             g = AgeGroup.UNDER_3 if age_key == AgeKeyChoices.UNDER_3 else AgeGroup.OVER_5
             if g == AgeGroup.UNDER_3:
-                rows = self.duty_rates.filter(audience=Audience.MOTORCYCLE_PHYS, age_group=g, unit=DutyUnit.PERCENT).order_by("max_value")
-                table = [{"max_cc": float(r.max_value or float("inf")), "rate_percent": float(r.rate_percent or 0.0), "min_rate_eur_cc": float(r.min_rate_eur_cc or 0.0)} for r in rows]
+                rows = self.duty_rates.filter(audience=Audience.MOTORCYCLE_PHYS, age_group=g,
+                                              unit=DutyUnit.PERCENT).order_by("max_value")
+                table = [{"max_cc": float(r.max_value or float("inf")), "rate_percent": float(r.rate_percent or 0.0),
+                          "min_rate_eur_cc": float(r.min_rate_eur_cc or 0.0)} for r in rows]
                 if not table:
                     return 0.0
                 row = self._find_bracket(cc, table, "max_cc")
@@ -240,8 +243,10 @@ class CustomsCalculator:
                     rate_percent /= 100.0
                 return max(price_eur * rate_percent, cc * float(row.get("min_rate_eur_cc", 0.0)))
             else:
-                rows = self.duty_rates.filter(audience=Audience.MOTORCYCLE_PHYS, age_group=g, unit=DutyUnit.EUR_CC).order_by("max_value")
-                table = [{"max_cc": float(r.max_value or float("inf")), "rate_eur_cc": float(r.rate_eur_cc or 0.0)} for r in rows]
+                rows = self.duty_rates.filter(audience=Audience.MOTORCYCLE_PHYS, age_group=g,
+                                              unit=DutyUnit.EUR_CC).order_by("max_value")
+                table = [{"max_cc": float(r.max_value or float("inf")), "rate_eur_cc": float(r.rate_eur_cc or 0.0)} for
+                         r in rows]
                 if not table:
                     return 0.0
                 row = self._find_bracket(cc, table, "max_cc")
@@ -249,7 +254,8 @@ class CustomsCalculator:
         else:
             g = AgeGroup.UNDER_3 if age_key == AgeKeyChoices.UNDER_3 else AgeGroup.OVER_5
             if g == AgeGroup.UNDER_3:
-                rows = list(self.duty_rates.filter(audience=Audience.MOTORCYCLE_JUR, age_group=g, unit=DutyUnit.PERCENT))
+                rows = list(
+                    self.duty_rates.filter(audience=Audience.MOTORCYCLE_JUR, age_group=g, unit=DutyUnit.PERCENT))
                 if not rows:
                     return 0.0
                 rate_percent = float(rows[0].rate_percent or 0.0)
@@ -257,8 +263,10 @@ class CustomsCalculator:
                     rate_percent /= 100.0
                 return price_eur * rate_percent
             else:
-                rows = self.duty_rates.filter(audience=Audience.MOTORCYCLE_JUR, age_group=g, unit=DutyUnit.PERCENT).order_by("max_value")
-                table = [{"max_cc": float(r.max_value or float("inf")), "rate_percent": float(r.rate_percent or 0.0), "min_rate_eur_cc": float(r.min_rate_eur_cc or 0.0)} for r in rows]
+                rows = self.duty_rates.filter(audience=Audience.MOTORCYCLE_JUR, age_group=g,
+                                              unit=DutyUnit.PERCENT).order_by("max_value")
+                table = [{"max_cc": float(r.max_value or float("inf")), "rate_percent": float(r.rate_percent or 0.0),
+                          "min_rate_eur_cc": float(r.min_rate_eur_cc or 0.0)} for r in rows]
                 if not table:
                     return 0.0
                 row = self._find_bracket(cc, table, "max_cc")
@@ -267,7 +275,8 @@ class CustomsCalculator:
                     rate_percent /= 100.0
                 return max(price_eur * rate_percent, cc * float(row.get("min_rate_eur_cc", 0.0)))
 
-    def _calc_duty(self, price_eur: float, engine_cc: int, age_key: AgeKey, is_jur: bool, engine_type: EngineType) -> float:
+    def _calc_duty(self, price_eur: float, engine_cc: int, age_key: AgeKey, is_jur: bool,
+                   engine_type: EngineType) -> float:
         if not is_jur:
             # PASSENGER_CAR_PHYS
             group_map: dict[AgeKey, AgeGroup] = {
@@ -317,7 +326,8 @@ class CustomsCalculator:
                 row = self._find_bracket(engine_cc, rows, "max_cc")
                 return engine_cc * float(row.get("rate_eur_cc", 0.0))
 
-    def _calc_util(self, is_commercial: bool, age_key: AgeKey, engine_cc: int, engine_type: EngineType, vehicle_type: VehicleType = VehicleTypeChoices.CAR) -> float:
+    def _calc_util(self, is_commercial: bool, age_key: AgeKey, engine_cc: int, engine_type: EngineType,
+                   vehicle_type: VehicleType = VehicleTypeChoices.CAR) -> float:
         # util_base хранится в Settings (fallback к 20000.0 при отсутствии)
         util_base = float(getattr(self.settings, "util_base", 20000.0) or 20000.0)
         if not is_commercial and vehicle_type == VehicleTypeChoices.CAR:
@@ -342,9 +352,9 @@ class CustomsCalculator:
         else:
             # EV/Hybrid коммерческий: по v2 фиксированные коэффициенты, не зависящие от объёма
             if vehicle_type == VehicleTypeChoices.CAR and engine_type in (
-                EngineTypeChoices.ELECTRO,
-                EngineTypeChoices.HYBRID_SERIES,
-                EngineTypeChoices.HYBRID_PARALLEL,
+                    EngineTypeChoices.ELECTRO,
+                    EngineTypeChoices.HYBRID_SERIES,
+                    EngineTypeChoices.HYBRID_PARALLEL,
             ):
                 if age_key == AgeKeyChoices.UNDER_3:
                     coeff = 1.42  # new_electric/new_hybrid
@@ -366,18 +376,28 @@ class CustomsCalculator:
             row = self._find_bracket(engine_cc, table, "max_cc")
             return util_base * float(row.get("coeff", 0.0))
 
-    def _calc_accise(self, hp: int, is_commercial: bool, engine_type: EngineType, dvs_hp: int | None = None, electric_hp: int | None = None) -> float:
-        if not is_commercial:
-            return 0.0
-        # Определяем мощность для расчёта по v2
+    def _calc_accise(self, hp: int, is_commercial: bool, engine_type: EngineType, dvs_hp: int | None = None,
+                     electric_hp: int | None = None) -> float:
+        """Акциз по v5.
+
+        - EV: прогрессивный акциз по мощности применяется всегда (включая ФЛ личное использование).
+        - Прочие типы: как ранее, акциз только для коммерции/юрлиц.
+        - Для гибридов определяем мощность согласно типу гибрида (серийный: сумма, параллельный: dvs_hp или 65% от hp).
+        Ставки берём из таблицы AcciseRate (руб/л.с. по брекетам max_hp).
+        """
+        # EV — всегда считаем по прогрессивной шкале
         if engine_type == EngineTypeChoices.ELECTRO:
-            power_for_tax = hp
-        elif engine_type == EngineTypeChoices.HYBRID_SERIES:
-            power_for_tax = int((dvs_hp or 0) + (electric_hp or 0))
-        elif engine_type == EngineTypeChoices.HYBRID_PARALLEL:
-            power_for_tax = int(dvs_hp if dvs_hp is not None else int(hp * 0.65))
+            power_for_tax = int(hp)
         else:
-            power_for_tax = hp
+            # Для не-EV: применяем акциз только для коммерции
+            if not is_commercial:
+                return 0.0
+            if engine_type == EngineTypeChoices.HYBRID_SERIES:
+                power_for_tax = int((dvs_hp or 0) + (electric_hp or 0))
+            elif engine_type == EngineTypeChoices.HYBRID_PARALLEL:
+                power_for_tax = int(dvs_hp if dvs_hp is not None else int(hp * 0.65))
+            else:
+                power_for_tax = int(hp)
 
         rows = list(self.accise_rates.order_by("max_hp"))
         table = [{"max_hp": float(r.max_hp), "rate": float(r.rate_rub_per_hp)} for r in rows]
@@ -430,7 +450,8 @@ class CustomsCalculator:
                 if eng == EngineTypeChoices.ELECTRO:
                     duty_eur = price_eur * 0.15
                 elif eng in (EngineTypeChoices.HYBRID_SERIES, EngineTypeChoices.HYBRID_PARALLEL):
-                    duty_eur = self._calc_duty(price_eur, int(data.engine_cc), age, data.is_jur, EngineTypeChoices.BENZIN)
+                    duty_eur = self._calc_duty(price_eur, int(data.engine_cc), age, data.is_jur,
+                                               EngineTypeChoices.BENZIN)
                 else:
                     duty_eur = self._calc_duty(price_eur, int(data.engine_cc), age, data.is_jur, eng)
         elif veh == VehicleTypeChoices.QUAD:
@@ -444,12 +465,9 @@ class CustomsCalculator:
         duty_rub = duty_eur * float(fx.get(CurrencyChoices.EUR.value, 1.0))
 
         util_fee = self._calc_util(is_commercial, age, int(data.engine_cc), eng, veh)
-        # Акциз: только для легковых автомобилей. Для EV (v4) — всегда 0.
+        # Акциз по v5: для легковых считаем через _calc_accise (EV — тоже облагается).
         if veh == VehicleTypeChoices.CAR:
-            if eng == EngineTypeChoices.ELECTRO:
-                accise_rub = 0.0
-            else:
-                accise_rub = self._calc_accise(int(data.hp), is_commercial, eng, data.dvs_hp, data.electric_hp)
+            accise_rub = self._calc_accise(int(data.hp), is_commercial, eng, data.dvs_hp, data.electric_hp)
         else:
             accise_rub = 0.0
         vat_rub = self._calc_vat(price_rub, duty_rub, accise_rub, is_commercial)
