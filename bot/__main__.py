@@ -6,8 +6,8 @@ import sys
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-from aiogram.types import BotCommand
 from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.types import BotCommand
 
 from api.config.logging import LOGGING
 from bot.config.bot import RUNNING_MODE, TELEGRAM_API_TOKEN, RunningMode
@@ -30,8 +30,9 @@ dispatcher.include_router(router)
 async def set_bot_commands() -> None:
     await bot.set_my_commands(
         [
-            BotCommand(command="/start", description="Register the bot"),
-            BotCommand(command="/id", description="Get the user and chat ids"),
+            BotCommand(command="/start", description="Запуск и регистрация"),
+            # BotCommand(command="/calc", description="Быстрый расчёт в одну строку"),
+            # BotCommand(command="/cancel", description="Сбросить текущий визард"),
         ],
     )
 
