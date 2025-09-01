@@ -36,12 +36,12 @@ def format_rates_message(rates: dict[str, float]) -> str:
 
     Заголовок: "Курсы валют на DD/MM/YYYY: (ЦБ РФ)"
     Строки: "<флаг> CODE => VALUE"; для JPY — 6 знаков после запятой, иначе 4.
-    Для USD используем символ "💲" вместо флага.
+    Для всех валют используем флаг.
     """
     order = ("EUR", "USD", "CNY", "KRW", "JPY")
     today = datetime.now().strftime("%d/%m/%Y")
-    # Первая строка — жирным целиком, часть (ЦБ РФ) дополнительно курсивом
-    header = f"<b>Курсы валют на {today} (<i>ЦБ РФ</i>):</b>"
+    # Первая строка — жирным целиком, дата подчёркнута, (ЦБ РФ) — курсивом
+    header = f"<b>Курсы валют на <u>{today}</u> (<i>ЦБ РФ</i>):</b>"
     lines: list[str] = [header, ""]  # пустая строка после заголовка
     for code in order:
         try:
@@ -50,9 +50,9 @@ def format_rates_message(rates: dict[str, float]) -> str:
             v = 0.0
         if not v:
             continue
-        flag = "💲" if code == "USD" else get_currency_flag(code)
+        flag = get_currency_flag(code)
         precision = 6 if code == "JPY" else 4
-        lines.append(f"{flag} {code} => {v:.{precision}f} 🇷🇺 RUB")
+        lines.append(f"{flag} {code} => <b>{v:.{precision}f}</b>")
     return "\n".join(lines)
 
 
