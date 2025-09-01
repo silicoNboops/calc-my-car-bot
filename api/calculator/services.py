@@ -292,7 +292,8 @@ class CustomsCalculator:
             group_map: dict[AgeKey, AgeGroup] = {
                 AgeKeyChoices.UNDER_3: AgeGroup.UNDER_3,
                 AgeKeyChoices.FROM_3_TO_5: AgeGroup.FROM_3_TO_5,
-                AgeKeyChoices.OVER_5: AgeGroup.OVER_5,
+                AgeKeyChoices.FROM_5_TO_7: AgeGroup.OVER_5,
+                AgeKeyChoices.OVER_7: AgeGroup.OVER_5,
             }
             g = group_map.get(age_key, AgeGroup.UNDER_3)
             rows = self._collect_duty_rows(Audience.PASSENGER_CAR_PHYS, g)
@@ -481,8 +482,9 @@ class CustomsCalculator:
         def _age_years(a: AgeKeyChoices) -> int:
             if a == AgeKeyChoices.UNDER_3:
                 return 1
-            if a in (AgeKeyChoices.BETWEEN_3_5, AgeKeyChoices.BETWEEN_3_7, AgeKeyChoices.FROM_3_TO_5):
+            if a == AgeKeyChoices.FROM_3_TO_5:
                 return 4
+            # Всё, что старше 5 лет (5–7 и >7), трактуем как 6 для V5 совместимости
             return 6
 
         # 6) Собираем спеку V5
