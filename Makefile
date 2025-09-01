@@ -27,9 +27,9 @@ run.celery.prod:
 run.celery.beat.local:
 	celery -A tasks.app beat --loglevel=INFO
 
-# Manual trigger for daily rates task (local env)
-task.daily.send:
-	celery -A tasks.app call tasks.daily.send_daily_rates
+# Manual trigger for daily rates task (docker env)
+task.rates:
+	docker compose run --rm celery celery -A tasks.app call tasks.daily.send_daily_rates
 
 makemigrations:
 	python manage.py makemigrations
@@ -42,7 +42,7 @@ collectstatic:
 
 createsuperuser:
 	python manage.py createsuperuser --email "" --username admin
-	python manage.py init_admin_telegram_id
+	python manage.py init_admin_telegram_id	
 
 # Seed customs rates (production-safe)
 seed.rates.dryrun.prod:
