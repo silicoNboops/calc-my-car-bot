@@ -4,9 +4,9 @@ import json
 from pathlib import Path
 from typing import Any
 
+from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
-from django.conf import settings
 
 from api.calculator.models import DutyRate, UtilFee, AcciseRate, CustomsFee, Settings
 
@@ -129,6 +129,8 @@ class Command(BaseCommand):
                 Settings.objects.create(
                     vat_rate=settings_payload.get("vat_rate", 0.2),
                     company_commission_rub=settings_payload.get("company_commission_rub", 69000.0),
+                    # Поддержка util_base, если присутствует в фикстуре; иначе используем дефолт модели
+                    util_base=settings_payload.get("util_base", 20000.0),
                 )
 
             # Bulk create rate tables
@@ -149,13 +151,27 @@ class Command(BaseCommand):
                 ])
 
             if merged["util_fees"]:
+                # Дедупликация по (kind, max_cc) с политикой last-file-wins и стабильным порядком
+                dedup_util: dict[tuple[str, float | None], dict[str, Any]] = {}
+                for item in merged["util_fees"]:
+                    key = (str(item["kind"]), (float(item["max_cc"]) if item.get("max_cc") is not None else None))
+                    dedup_util[key] = item
+
+                # Упорядочим по kind, затем по max_cc (None в конец)
+                def _sort_key(k: tuple[str, float | None]) -> tuple[str, float]:
+                    kind, max_cc = k
+                    return (kind, float("inf") if max_cc is None else float(max_cc))
+
+                ordered_keys = sorted(dedup_util.keys(), key=_sort_key)
+                ordered_items = [dedup_util[k] for k in ordered_keys]
+
                 UtilFee.objects.bulk_create([
                     UtilFee(
-                        kind=item["kind"],
-                        max_cc=item.get("max_cc"),
-                        coeff=item["coeff"],
+                        kind=it["kind"],
+                        max_cc=it.get("max_cc"),
+                        coeff=it["coeff"],
                     )
-                    for item in merged["util_fees"]
+                    for it in ordered_items
                 ])
 
             if merged["accise_rates"]:
