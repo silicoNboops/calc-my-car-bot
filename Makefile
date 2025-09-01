@@ -23,6 +23,14 @@ run.celery.local:
 run.celery.prod:
 	celery -A tasks.app worker --loglevel=INFO
 
+# Celery beat (scheduler)
+run.celery.beat.local:
+	celery -A tasks.app beat --loglevel=INFO
+
+# Manual trigger for daily rates task (local env)
+task.daily.send:
+	celery -A tasks.app call tasks.daily.send_daily_rates
+
 makemigrations:
 	python manage.py makemigrations
 
