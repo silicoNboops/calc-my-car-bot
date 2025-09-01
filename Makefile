@@ -45,28 +45,28 @@ createsuperuser:
 	python manage.py init_admin_telegram_id
 
 # Seed customs rates (production-safe)
-.PHONY: seed.rates.dryrun.prod seed.rates.prod check.rates
+.PHONY: seed.rates.dryrun.prod seed.rates.prod check.rates test-pg-docker
 seed.rates.dryrun.prod:
 	docker compose --env-file .env run --rm \
-		-e ENVIRONMENT=production \
-		api python manage.py seed_customs_rates --path api/calculator/fixtures --version-tag legacy --dry-run
+	  -e ENVIRONMENT=production \
+	  api python manage.py seed_customs_rates --path api/calculator/fixtures --version-tag legacy --dry-run
 	docker compose --env-file .env run --rm \
-		-e ENVIRONMENT=production \
-		api python manage.py seed_customs_rates --path api/calculator/fixtures --version-tag 2025_08_17 --dry-run
+	  -e ENVIRONMENT=production \
+	  api python manage.py seed_customs_rates --path api/calculator/fixtures --version-tag 2025_08_17 --dry-run
 
 seed.rates.prod:
 	docker compose --env-file .env run --rm \
-		-e ENVIRONMENT=production \
-		api python manage.py seed_customs_rates --path api/calculator/fixtures --version-tag legacy --replace
+	  -e ENVIRONMENT=production \
+	  api python manage.py seed_customs_rates --path api/calculator/fixtures --version-tag legacy --replace
 	docker compose --env-file .env run --rm \
-		-e ENVIRONMENT=production \
-		api python manage.py seed_customs_rates --path api/calculator/fixtures --version-tag 2025_08_17
+	  -e ENVIRONMENT=production \
+	  api python manage.py seed_customs_rates --path api/calculator/fixtures --version-tag 2025_08_17
 
 # Quick check of seeded rows
 check.rates:
 	docker compose --env-file .env run --rm \
-		-e ENVIRONMENT=production \
-		api python manage.py shell -c 'from api.calculator.models import DutyRate, UtilFee, AcciseRate, CustomsFee, Settings; print("DutyRate", DutyRate.objects.count()); print("UtilFee", UtilFee.objects.count()); print("AcciseRate", AcciseRate.objects.count()); print("CustomsFee", CustomsFee.objects.count()); print("Settings", Settings.objects.count())'
+	  -e ENVIRONMENT=production \
+	  api python manage.py shell -c 'from api.calculator.models import DutyRate, UtilFee, AcciseRate, CustomsFee, Settings; print("DutyRate", DutyRate.objects.count()); print("UtilFee", UtilFee.objects.count()); print("AcciseRate", AcciseRate.objects.count()); print("CustomsFee", CustomsFee.objects.count()); print("Settings", Settings.objects.count())'
 
 # Tests, linters & formatters
 fmt:
@@ -122,6 +122,9 @@ test-pg-cov:
 # Usage (from host): `make test-pg-docker`
 test-pg-docker:
 	docker compose --env-file .env run --rm \
-		-e ENVIRONMENT=local \
-		-e USE_FIXED_CURRENCY_PROVIDER=1 \
-		api make test-pg
+	  -e ENVIRONMENT=local \
+	  -e USE_FIXED_CURRENCY_PROVIDER=1 \
+	  -e POSTGRES_USER \
+	  -e POSTGRES_PASSWORD \
+	  -e POSTGRES_DB \
+	  api make test-pg
