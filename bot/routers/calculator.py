@@ -31,6 +31,7 @@ from bot.keyboards.calculator import (
     age_key_kb,
     format_age_key_title,
 )
+from bot.keyboards.lead import lead_after_calc_kb
 from bot.states import CalculatorState
 from bot.utils.currency import format_currency_title
 from bot.utils.formatting import (
@@ -92,6 +93,43 @@ def _estimate_sync(payload: dict) -> tuple[str, dict[str, float], float]:
         pass
     res = calc.estimate(EstimateInput(**data))
     return _format_calc_result(res), provider.get_rates(), float(res.subtotal_customs)
+
+
+def _estimate_sync_with_data(payload: dict) -> tuple[str, dict[str, float], float, dict]:
+    """Синхронный расчёт с возвратом полных данных для заявки."""
+    provider = get_default_currency_provider()
+    service = CalculatorService(currency_provider=provider)
+    calc = service.build_calculator()
+    # Приводим типы к TextChoices, если пришли строки
+    data = dict(payload)
+    try:
+        if not isinstance(data.get("currency"), CurrencyChoices):
+            data["currency"] = CurrencyChoices(data["currency"])  # type: ignore[arg-type]
+        if not isinstance(data.get("engine_type"), EngineTypeChoices):
+            data["engine_type"] = EngineTypeChoices(data["engine_type"])  # type: ignore[arg-type]
+        if not isinstance(data.get("vehicle_type"), VehicleTypeChoices):
+            data["vehicle_type"] = VehicleTypeChoices(data["vehicle_type"])  # type: ignore[arg-type]
+        if not isinstance(data.get("age_key"), AgeKeyChoices):
+            data["age_key"] = AgeKeyChoices(data["age_key"])  # type: ignore[arg-type]
+    except Exception:
+        # Если не удалось привести — пусть выбросится позже в расчёте
+        pass
+    res = calc.estimate(EstimateInput(**data))
+    
+    # Формируем полные данные результата
+    result_data = {
+        'subtotal_customs': float(res.subtotal_customs),
+        'duty_rub': float(res.duty_rub),
+        'duty_eur': float(res.duty_eur),
+        'vat_rub': float(res.vat_rub),
+        'util_fee': float(res.util_fee),
+        'accise_rub': float(res.accise_rub),
+        'customs_fee': float(res.customs_fee),
+        'price_rub': float(res.price_rub),
+        'price_eur': float(res.price_eur),
+    }
+    
+    return _format_calc_result(res), provider.get_rates(), float(res.subtotal_customs), result_data
 
 
 def _get_company_commission_rub() -> float:
@@ -336,7 +374,7 @@ _calc_accise(self, hp, is_commercial, engine_type, ...)
         "vehicle_type": str(data.get("vehicle_type", "car")),
     }
     try:
-        result_text, rates, subtotal_customs = await sync_to_async(_estimate_sync)(payload)
+        result_text, rates, subtotal_customs, calc_result = await sync_to_async(_estimate_sync_with_data)(payload)
     except Exception as e:  # noqa: BLE001
         await call.message.edit_text(f"Ошибка расчёта: {e}")
         await call.answer()
@@ -392,7 +430,15 @@ _calc_accise(self, hp, is_commercial, engine_type, ...)
     )
 
     final_text = header + result_text + broker_line + itog_line + fx_line + CONTACT_LINE
-    await _edit_or_send(call.message, final_text, reply_markup=None)
+    
+    # Сохраняем данные расчета для возможной заявки
+    import datetime
+    await state.update_data(
+        calculation_params=payload,
+        calculation_result=calc_result,
+        calculation_created_at=datetime.datetime.now().isoformat()
+    )
+    
+    await _edit_or_send(call.message, final_text, reply_markup=lead_after_calc_kb())
     await call.answer()
-    # Сбрасываем состояние и данные визарда
-    await state.clear()
+    # НЕ сбрасываем состояние - оставляем данные для заявки
