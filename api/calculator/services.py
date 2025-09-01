@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 import logging
 import os
 from dataclasses import dataclass
@@ -26,6 +27,15 @@ from api.calculator.models import (
     DutyRate,
     Settings,
     UtilFee,
+)
+# V5 legacy calculator (single source of calculation truth)
+from calculator.customs_calculator_v5 import (
+    VehicleType as V5VehicleType,
+    ImporterType as V5ImporterType,
+    EngineType as V5EngineType,
+    VehicleSpec as V5VehicleSpec,
+    calculate_customs_payments as v5_calculate,
+    RatesFetcher as V5RatesFetcher,
 )
 
 # Используем Django TextChoices как единый источник истины.
@@ -424,71 +434,90 @@ class CustomsCalculator:
         return float(row.get("fee", 0.0))
 
     def estimate(self, data: EstimateInput) -> EstimateResult:
-        # Конвертация валют (как в legacy): fx — RUB за единицу валюты
-        fx = self.currency_rates
-        # Нормализация входных значений: допускаем как TextChoices, так и строки
+        """Полная переадресация расчёта в legacy V5 калькулятор.
+
+        1) Переносим входные данные EstimateInput -> V5 VehicleSpec.
+        2) Подсовываем курсы валют из текущего провайдера в кэш V5 RatesFetcher,
+           чтобы избежать сетевых запросов и обеспечить детерминизм.
+        3) Вызываем v5_calculate(...) и маппим результат в EstimateResult.
+        """
+
+        # 1) Нормализуем перечисления (допускаем строки)
         cur = data.currency if not isinstance(data.currency, str) else CurrencyChoices(data.currency)
         veh = data.vehicle_type if not isinstance(data.vehicle_type, str) else VehicleTypeChoices(data.vehicle_type)
         eng = data.engine_type if not isinstance(data.engine_type, str) else EngineTypeChoices(data.engine_type)
         age = data.age_key if not isinstance(data.age_key, str) else AgeKeyChoices(data.age_key)
 
-        if cur.value not in fx:
-            msg = f"Unsupported currency: {data.currency}"
-            raise ValueError(msg)
-        price_rub = float(data.price) * float(fx[cur.value])
-        price_eur = price_rub / float(fx.get(CurrencyChoices.EUR.value, 1.0))
+        # 2) Курсы валют: кладём в кэш V5
+        fx = dict(self.currency_rates)
+        V5RatesFetcher._cache = {k.upper(): float(v) for k, v in fx.items()}
+        V5RatesFetcher._cache["RUB"] = float(V5RatesFetcher._cache.get("RUB", 1.0))
+        V5RatesFetcher._cache_time = datetime.datetime.now()
 
-        is_commercial = data.is_jur or (data.is_personal_use is False)
-
-        # Пошлина: зависит от vehicle_type
-        if veh == VehicleTypeChoices.CAR:
-            if not data.is_jur:
-                # ФЛ: для EV — 15% всегда; гибриды считаются как ДВС по ETS (через общую таблицу)
-                if eng == EngineTypeChoices.ELECTRO:
-                    duty_eur = price_eur * 0.15
-                else:
-                    duty_eur = self._calc_duty(price_eur, int(data.engine_cc), age, data.is_jur, eng)
+        # 3) Маппинг импортёра
+        if data.is_jur:
+            importer = V5ImporterType.JURIDICAL
+        else:
+            if data.is_personal_use is False:
+                importer = V5ImporterType.PHYS_RESALE
             else:
-                # ЮЛ: EV — 15% от стоимости; гибриды — как бензин по таблицам; иное — по таблицам
-                if eng == EngineTypeChoices.ELECTRO:
-                    duty_eur = price_eur * 0.15
-                elif eng in (EngineTypeChoices.HYBRID_SERIES, EngineTypeChoices.HYBRID_PARALLEL):
-                    duty_eur = self._calc_duty(price_eur, int(data.engine_cc), age, data.is_jur,
-                                               EngineTypeChoices.BENZIN)
-                else:
-                    duty_eur = self._calc_duty(price_eur, int(data.engine_cc), age, data.is_jur, eng)
-        elif veh == VehicleTypeChoices.QUAD:
-            duty_eur = self._calc_duty_quad(price_eur, int(data.hp), age, data.is_jur)
-        elif veh == VehicleTypeChoices.SNOWMOBILE:
-            duty_eur = self._calc_duty_snowmobile(price_eur, int(data.hp), age, data.is_jur)
-        elif veh == VehicleTypeChoices.MOTORCYCLE:
-            duty_eur = self._calc_duty_motorcycle(price_eur, int(data.engine_cc), age, data.is_jur)
-        else:
-            duty_eur = 0.0
-        duty_rub = duty_eur * float(fx.get(CurrencyChoices.EUR.value, 1.0))
+                importer = V5ImporterType.PHYS_PERSONAL
 
-        util_fee = self._calc_util(is_commercial, age, int(data.engine_cc), eng, veh)
-        # Акциз по v5: для легковых считаем через _calc_accise (EV — тоже облагается).
-        if veh == VehicleTypeChoices.CAR:
-            accise_rub = self._calc_accise(int(data.hp), is_commercial, eng, data.dvs_hp, data.electric_hp)
-        else:
-            accise_rub = 0.0
-        vat_rub = self._calc_vat(price_rub, duty_rub, accise_rub, is_commercial)
-        # Таможенный сбор по v3: всегда по таблице ПП РФ №1637
-        customs_fee = self._calc_customs_fee(price_rub)
+        # 4) Маппинг типов
+        v5_vehicle = {
+            VehicleTypeChoices.CAR: V5VehicleType.CAR,
+            VehicleTypeChoices.QUAD: V5VehicleType.QUAD,
+            VehicleTypeChoices.SNOWMOBILE: V5VehicleType.SNOWMOBILE,
+            VehicleTypeChoices.MOTORCYCLE: V5VehicleType.MOTORCYCLE,
+        }[veh]
 
-        subtotal_customs = duty_rub + util_fee + accise_rub + vat_rub + customs_fee
+        v5_engine = {
+            EngineTypeChoices.ELECTRO: V5EngineType.ELECTRIC,
+            EngineTypeChoices.HYBRID_SERIES: V5EngineType.HYBRID_SERIES,
+            EngineTypeChoices.HYBRID_PARALLEL: V5EngineType.HYBRID_PARALLEL,
+        }.get(eng, V5EngineType.DVS)
+
+        # 5) Возраст в годах для V5
+        def _age_years(a: AgeKeyChoices) -> int:
+            if a == AgeKeyChoices.UNDER_3:
+                return 1
+            if a in (AgeKeyChoices.BETWEEN_3_5, AgeKeyChoices.BETWEEN_3_7, AgeKeyChoices.FROM_3_TO_5):
+                return 4
+            return 6
+
+        # 6) Собираем спеку V5
+        spec = V5VehicleSpec(
+            vehicle_type=v5_vehicle,
+            importer_type=importer,
+            cost_original=float(data.price),
+            currency=str(cur.value),
+            age_years=_age_years(age),
+            engine_volume_cc=int(data.engine_cc),
+            power_hp=int(data.hp or 0),
+            engine_type=v5_engine,
+            dvs_power_hp=int(data.dvs_hp or 0),
+            electric_power_hp=int(data.electric_hp or 0),
+        )
+
+        # 7) Вызываем V5 калькулятор
+        v5_res = v5_calculate(spec)
+
+        # 8) Маппим ответ V5 -> EstimateResult
+        # price_eur берём из breakdown, если есть; иначе пересчитываем из курса
+        bd = v5_res.breakdown or {}
+        eur_rate = float(bd.get("eur_rate") or fx.get("EUR") or 1.0)
+        price_eur = float(bd.get("cost_eur")) if "cost_eur" in bd else float(v5_res.cost_rub) / float(eur_rate)
 
         return EstimateResult(
-            price_rub=price_rub,
-            price_eur=price_eur,
-            duty_eur=duty_eur,
-            duty_rub=duty_rub,
-            util_fee=util_fee,
-            accise_rub=accise_rub,
-            vat_rub=vat_rub,
-            customs_fee=customs_fee,
-            subtotal_customs=subtotal_customs,
+            price_rub=float(v5_res.cost_rub),
+            price_eur=float(price_eur),
+            duty_eur=float(bd.get("duty_eur", 0.0)),
+            duty_rub=float(v5_res.duty_rub),
+            util_fee=float(v5_res.util_fee_rub),
+            accise_rub=float(v5_res.excise_rub),
+            vat_rub=float(v5_res.vat_rub),
+            customs_fee=float(v5_res.customs_fee_rub),
+            subtotal_customs=float(v5_res.total_rub),
         )
 
 
