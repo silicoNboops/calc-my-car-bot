@@ -107,11 +107,14 @@ class Command(BaseCommand):
             "customs": len(merged["customs_fees"]),
         }
         self.stdout.write(
-            f"Summary: duty={summary['duty']}, util={summary['util']}, accise={summary['accise']}, customs={summary['customs']}",
+            f"Summary: duty={summary['duty']}, util={summary['util']}, "
+            f"accise={summary['accise']}, customs={summary['customs']}",
         )
 
         if dry_run:
-            self.stdout.write(self.style.SUCCESS("Dry run finished. No changes applied."))
+            self.stdout.write(self.style.SUCCESS(
+                "Dry run finished. No changes applied.")
+            )
             return
 
         with transaction.atomic():
@@ -128,8 +131,11 @@ class Command(BaseCommand):
             if settings_payload:
                 Settings.objects.create(
                     vat_rate=settings_payload.get("vat_rate", 0.2),
-                    company_commission_rub=settings_payload.get("company_commission_rub", 69000.0),
-                    # Поддержка util_base, если присутствует в фикстуре; иначе используем дефолт модели
+                    company_commission_rub=settings_payload.get(
+                        "company_commission_rub", 69000.0
+                    ),
+                    # Поддержка util_base, если присутствует в фикстуре;
+                    # иначе используем дефолт модели
                     util_base=settings_payload.get("util_base", 20000.0),
                 )
 
@@ -151,10 +157,14 @@ class Command(BaseCommand):
                 ])
 
             if merged["util_fees"]:
-                # Дедупликация по (kind, max_cc) с политикой last-file-wins и стабильным порядком
+                # Дедупликация по (kind, max_cc) с политикой last-file-wins и
+                # стабильным порядком
                 dedup_util: dict[tuple[str, float | None], dict[str, Any]] = {}
                 for item in merged["util_fees"]:
-                    key = (str(item["kind"]), (float(item["max_cc"]) if item.get("max_cc") is not None else None))
+                    key = (
+                        str(item["kind"]),
+                        (float(item["max_cc"]) if item.get("max_cc") is not None else None)
+                    )
                     dedup_util[key] = item
 
                 # Упорядочим по kind, затем по max_cc (None в конец)
@@ -186,7 +196,8 @@ class Command(BaseCommand):
             if merged["customs_fees"]:
                 # Refresh CustomsFee deterministically on every load
                 CustomsFee.objects.all().delete()
-                # Deduplicate by max_value_rub with last-file-wins policy and order ascending
+                # Deduplicate by max_value_rub with last-file-wins policy and
+                # order ascending
                 dedup: dict[float, dict[str, Any]] = {}
                 for item in merged["customs_fees"]:
                     # use float key to normalize numeric types
