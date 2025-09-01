@@ -330,6 +330,9 @@ class CustomsCalculator:
                    vehicle_type: VehicleType = VehicleTypeChoices.CAR) -> float:
         # util_base хранится в Settings (fallback к 20000.0 при отсутствии)
         util_base = float(getattr(self.settings, "util_base", 20000.0) or 20000.0)
+        # По требованиям оригинального калькулятора: для мотоциклов и снегоходов утильсбор всегда 0
+        if vehicle_type in (VehicleTypeChoices.MOTORCYCLE, VehicleTypeChoices.SNOWMOBILE):
+            return 0.0
         if not is_commercial and vehicle_type == VehicleTypeChoices.CAR:
             # Берём детерминированно запись с max_cc IS NULL из боевых фикстур
             # (избегаем влияния шаблонных фикстур и сортировки NULL в разных СУБД)
