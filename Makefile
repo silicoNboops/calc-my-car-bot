@@ -81,6 +81,12 @@ ruff:
 ruff-fmt:
 	python -m ruff --fix-only --unsafe-fixes .
 
+mypy:
+	python -m mypy .
+
+
+# TESTS
+
 test:
 	python -m pytest
 
@@ -116,5 +122,3 @@ test-pg-docker:
 		-e POSTGRES_DB \
 		api make test-pg'
 
-mypy:
-	python -m mypy .
