@@ -21,7 +21,7 @@ class EstimateRequestSerializer(serializers.Serializer):
         ],
         default="Бензин",
     )
-    age_key = serializers.ChoiceField(choices=["under_3", "3_to_5", "5_to_7", "over_7", "over_5"], default="under_3")
+    age_key = serializers.CharField(default="under_3")
     is_jur = serializers.BooleanField(default=False)
     is_personal_use = serializers.BooleanField(required=False)
     # Доп. поля для гибридов (опционально)
@@ -38,15 +38,15 @@ class EstimateRequestSerializer(serializers.Serializer):
         if "is_personal_use" not in attrs:
             attrs["is_personal_use"] = not is_jur
 
-        if is_jur:
-            # For legal entities we do not accept 'over_5' (legacy splits into 5-7 and over_7)
-            if age_key == "over_5":
-                raise serializers.ValidationError({
-                    "age_key": "Для юрлиц используйте '5_to_7' или 'over_7' вместо 'over_5'.",
-                })
-        elif age_key in {"5_to_7", "over_7"}:
-            # For physical persons normalize jur-only tails to 'over_5'
-            attrs["age_key"] = "over_5"
+        # Валидируем и нормализуем age_key
+        allowed = {"under_3", "3_to_5", "5_to_7", "over_7"}
+        legacy = {"over_5"}
+        if age_key in legacy:
+            attrs["age_key"] = "5_to_7"
+        elif age_key not in allowed:
+            raise serializers.ValidationError({
+                "age_key": "Недопустимое значение. Используйте 'under_3' | '3_to_5' | '5_to_7' | 'over_7'.",
+            })
 
         # Валидация для гибридов
         if engine_type in {"Гибрид(послед)", "Гибрид(паралл)"}:
@@ -54,7 +54,10 @@ class EstimateRequestSerializer(serializers.Serializer):
             electric_hp = int(attrs.get("electric_hp") or 0)
             # Не заставляем указывать оба, но проверим разумность
             if dvs_hp < 0 or electric_hp < 0:
-                raise serializers.ValidationError({"dvs_hp": "Значение не может быть отрицательным", "electric_hp": "Значение не может быть отрицательным"})
+                raise serializers.ValidationError({
+                    "dvs_hp": "Значение не может быть отрицательным",
+                    "electric_hp": "Значение не может быть отрицательным"
+                })
 
         # Ограничения по типу ТС: для не-"car" запрещаем EV/гибриды
         if vehicle_type != "car" and engine_type in {"Электро", "Гибрид(послед)", "Гибрид(паралл)"}:
