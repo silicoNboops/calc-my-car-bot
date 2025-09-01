@@ -5,26 +5,7 @@ from aiogram.types import InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from api.calculator.choices import VehicleType, Currency, ImporterKind, EngineType, AgeKey
-
-# Человекочитаемые названия валют для отображения в кнопках
-_CURRENCY_TITLES_RU: dict[str, str] = {
-    "CNY": "Юань",
-    "JPY": "Иена",
-    "KRW": "Вона",
-    "USD": "Доллар",
-    "EUR": "Евро",
-    "RUB": "Рубль",
-}
-
-# Эмодзи для валют (флаги). Используем перед текстом для лучшей читаемости
-_CURRENCY_FLAGS: dict[str, str] = {
-    "CNY": "🇨🇳",
-    "JPY": "🇯🇵",
-    "KRW": "🇰🇷",
-    "USD": "🇺🇸",
-    "EUR": "🇪🇺",
-    "RUB": "🇷🇺",
-}
+from bot.utils.currency import format_currency_title
 
 # Эмодзи для видов ТС (только в клавиатурах)
 _VEHICLE_EMOJI: dict[str, str] = {
@@ -58,9 +39,7 @@ def currency_kb() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     for value, label in Currency.choices:
         code = str(value)
-        title = _CURRENCY_TITLES_RU.get(code, str(label))
-        flag = _CURRENCY_FLAGS.get(code, "")
-        text = f"{flag} {title}".strip()
+        text = format_currency_title(code)
         builder.button(text=text, callback_data=CurrencyCD(code=code).pack())
     builder.adjust(1)
     return builder.as_markup()
@@ -71,17 +50,6 @@ def format_vehicle_title(value: str) -> str:
     label = dict(VehicleType.choices).get(value, value)
     emoji = _VEHICLE_EMOJI.get(value, "")
     return f"{emoji} {label}".strip()
-
-
-def format_currency_title(code: str) -> str:
-    title = _CURRENCY_TITLES_RU.get(code, dict(Currency.choices).get(code, code))
-    flag = get_currency_flag(code)
-    return f"{flag} {title}".strip()
-
-
-# Публичный хелпер для получения флажка по коду валюты
-def get_currency_flag(code: str) -> str:
-    return _CURRENCY_FLAGS.get(code, "")
 
 
 # ROLE (кто ввозит): физ/юр
