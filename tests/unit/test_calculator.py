@@ -27,7 +27,7 @@ def _seed_customs_rates(django_db_setup, django_db_blocker):  # type: ignore[no-
 
 
 @pytest.mark.django_db()
-def test_serializer_age_key_forbidden_over5_for_jur() -> None:
+def test_serializer_normalizes_legacy_over5_to_5_to_7_for_jur() -> None:
     s = EstimateRequestSerializer(data={
         "price": 10000,
         "currency": "EUR",
@@ -37,12 +37,12 @@ def test_serializer_age_key_forbidden_over5_for_jur() -> None:
         "age_key": "over_5",
         "is_jur": True,
     })
-    assert not s.is_valid()
-    assert "age_key" in s.errors
+    assert s.is_valid(), s.errors
+    assert s.validated_data["age_key"] == "5_to_7"
 
 
 @pytest.mark.django_db()
-def test_serializer_normalizes_phys_over7_to_over5() -> None:
+def test_serializer_keeps_phys_over7() -> None:
     s = EstimateRequestSerializer(data={
         "price": 10000,
         "currency": "EUR",
@@ -53,7 +53,7 @@ def test_serializer_normalizes_phys_over7_to_over5() -> None:
         "is_jur": False,
     })
     assert s.is_valid(), s.errors
-    assert s.validated_data["age_key"] == "over_5"
+    assert s.validated_data["age_key"] == "over_7"
     # is_personal_use should default to not is_jur
     assert s.validated_data["is_personal_use"] is True
 
