@@ -251,7 +251,8 @@ def test_ev_phys_over5_rules() -> None:
     assert pytest.approx(data["duty_eur"], rel=1e-6) == 1500.0
     # util_fee = 5200 (старше 3 лет для ФЛ)
     assert pytest.approx(data["util_fee"], rel=1e-6) == 5200.0
-    assert data["accise_rub"] == 0.0
+    # v5: EV облагается акцизом по ставке 61 руб/л.с. для 150 л.с. => 9150
+    assert pytest.approx(data["accise_rub"], rel=1e-6) == 9150.0
     assert data["vat_rub"] == 0.0
     # customs_fee — по таблице ПП РФ №1637 в зависимости от price_rub
     rows = list(CustomsFee.objects.order_by("max_value_rub"))
