@@ -123,7 +123,6 @@ _AGE_EMOJI: dict[str, str] = {
     AgeKey.FROM_3_TO_5: "🟡",
     AgeKey.FROM_5_TO_7: "🟠",
     AgeKey.OVER_7: "🔴",
-    AgeKey.OVER_5: "🔴",
 }
 
 

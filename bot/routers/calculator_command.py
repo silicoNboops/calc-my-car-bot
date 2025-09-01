@@ -29,7 +29,7 @@ def _parse_calc_args(text: str) -> dict | str:
     """Парсинг аргументов из сообщения.
 
     Ожидаемый формат (через пробел):
-    /calc <price> <currency: EUR|USD|RUB|CNY|JPY|KRW> <engine_cc> <hp> <engine_type: Бензин|Дизель> <age_key: under_3|3_to_5|5_to_7|over_7|over_5> [jur|phys] [personal|commercial]
+    /calc <price> <currency: EUR|USD|RUB|CNY|JPY|KRW> <engine_cc> <hp> <engine_type: Бензин|Дизель> <age_key: under_3|3_to_5|5_to_7|over_7> [jur|phys] [personal|commercial]
 
     Примеры:
     /calc 20000 EUR 1999 150 Бензин under_3 phys personal
@@ -41,6 +41,9 @@ def _parse_calc_args(text: str) -> dict | str:
 
     try:
         _, price, currency, engine_cc, hp, engine_type, age_key, *rest = parts
+        # Backward-compat: normalize legacy 'over_5' to '5_to_7'
+        if age_key == "over_5":
+            age_key = "5_to_7"
         is_jur = False
         is_personal_use = True
         if rest:

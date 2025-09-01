@@ -1,7 +1,8 @@
 {
   "settings": {
     "vat_rate": 0.2,
-    "company_commission_rub": 69000
+    "company_commission_rub": 69000,
+    "util_base": 20000
   },
   "duty_rates": [
     {
@@ -170,8 +171,53 @@
       "audience": "PASSENGER_CAR_JUR_BENZ",
       "age_group": "under_3_years",
       "unit": "percent",
-      "max_value": 3000,
+      "max_value": 1000,
       "rate_percent": 15,
+      "rate_eur_cc": null,
+      "min_rate_eur_cc": 0.0
+    },
+    {
+      "audience": "PASSENGER_CAR_JUR_BENZ",
+      "age_group": "under_3_years",
+      "unit": "percent",
+      "max_value": 1500,
+      "rate_percent": 15,
+      "rate_eur_cc": null,
+      "min_rate_eur_cc": 0.0
+    },
+    {
+      "audience": "PASSENGER_CAR_JUR_BENZ",
+      "age_group": "under_3_years",
+      "unit": "percent",
+      "max_value": 1800,
+      "rate_percent": 15,
+      "rate_eur_cc": null,
+      "min_rate_eur_cc": 0.0
+    },
+    {
+      "audience": "PASSENGER_CAR_JUR_BENZ",
+      "age_group": "under_3_years",
+      "unit": "percent",
+      "max_value": 2300,
+      "rate_percent": 15,
+      "rate_eur_cc": null,
+      "min_rate_eur_cc": 0.0
+    },
+    {
+      "audience": "PASSENGER_CAR_JUR_BENZ",
+      "age_group": "under_3_years",
+      "unit": "percent",
+      "max_value": 2800,
+      "rate_percent": 15,
+      "rate_eur_cc": null,
+      "min_rate_eur_cc": 0.0
+    },
+    {
+      "audience": "PASSENGER_CAR_JUR_BENZ",
+      "age_group": "under_3_years",
+      "unit": "percent",
+      "max_value": 3000,
+      "rate_percent": 12.5,
       "rate_eur_cc": null,
       "min_rate_eur_cc": 0.0
     },
@@ -185,6 +231,15 @@
       "min_rate_eur_cc": 0.0
     },
     {
+      "audience": "PASSENGER_CAR_JUR_DIESEL",
+      "age_group": "under_3_years",
+      "unit": "percent",
+      "max_value": 1e18,
+      "rate_percent": 15,
+      "rate_eur_cc": null,
+      "min_rate_eur_cc": 0.0
+    },
+    {
       "audience": "PASSENGER_CAR_JUR_BENZ",
       "age_group": "3_to_5_years",
       "unit": "percent",
@@ -200,7 +255,7 @@
       "max_value": 1500,
       "rate_percent": 20,
       "rate_eur_cc": null,
-      "min_rate_eur_cc": 0.4
+      "min_rate_eur_cc": 0.40
     },
     {
       "audience": "PASSENGER_CAR_JUR_BENZ",
@@ -224,6 +279,15 @@
       "audience": "PASSENGER_CAR_JUR_BENZ",
       "age_group": "3_to_5_years",
       "unit": "percent",
+      "max_value": 2800,
+      "rate_percent": 20,
+      "rate_eur_cc": null,
+      "min_rate_eur_cc": 0.44
+    },
+    {
+      "audience": "PASSENGER_CAR_JUR_BENZ",
+      "age_group": "3_to_5_years",
+      "unit": "percent",
       "max_value": 3000,
       "rate_percent": 20,
       "rate_eur_cc": null,
@@ -236,7 +300,7 @@
       "max_value": 1e18,
       "rate_percent": 20,
       "rate_eur_cc": null,
-      "min_rate_eur_cc": 0.8
+      "min_rate_eur_cc": 0.80
     },
     {
       "audience": "PASSENGER_CAR_JUR_BENZ",
@@ -254,7 +318,7 @@
       "max_value": 1500,
       "rate_percent": 20,
       "rate_eur_cc": null,
-      "min_rate_eur_cc": 0.4
+      "min_rate_eur_cc": 0.40
     },
     {
       "audience": "PASSENGER_CAR_JUR_BENZ",
@@ -278,6 +342,15 @@
       "audience": "PASSENGER_CAR_JUR_BENZ",
       "age_group": "5_to_7_years",
       "unit": "percent",
+      "max_value": 2800,
+      "rate_percent": 20,
+      "rate_eur_cc": null,
+      "min_rate_eur_cc": 0.44
+    },
+    {
+      "audience": "PASSENGER_CAR_JUR_BENZ",
+      "age_group": "5_to_7_years",
+      "unit": "percent",
       "max_value": 3000,
       "rate_percent": 20,
       "rate_eur_cc": null,
@@ -290,7 +363,61 @@
       "max_value": 1e18,
       "rate_percent": 20,
       "rate_eur_cc": null,
-      "min_rate_eur_cc": 0.8
+      "min_rate_eur_cc": 0.80
+    },
+    {
+      "audience": "PASSENGER_CAR_JUR_DIESEL",
+      "age_group": "3_to_5_years",
+      "unit": "percent",
+      "max_value": 1500,
+      "rate_percent": 20,
+      "rate_eur_cc": null,
+      "min_rate_eur_cc": 0.32
+    },
+    {
+      "audience": "PASSENGER_CAR_JUR_DIESEL",
+      "age_group": "3_to_5_years",
+      "unit": "percent",
+      "max_value": 2500,
+      "rate_percent": 20,
+      "rate_eur_cc": null,
+      "min_rate_eur_cc": 0.40
+    },
+    {
+      "audience": "PASSENGER_CAR_JUR_DIESEL",
+      "age_group": "3_to_5_years",
+      "unit": "percent",
+      "max_value": 1e18,
+      "rate_percent": 20,
+      "rate_eur_cc": null,
+      "min_rate_eur_cc": 0.80
+    },
+    {
+      "audience": "PASSENGER_CAR_JUR_DIESEL",
+      "age_group": "5_to_7_years",
+      "unit": "percent",
+      "max_value": 1500,
+      "rate_percent": 20,
+      "rate_eur_cc": null,
+      "min_rate_eur_cc": 0.32
+    },
+    {
+      "audience": "PASSENGER_CAR_JUR_DIESEL",
+      "age_group": "5_to_7_years",
+      "unit": "percent",
+      "max_value": 2500,
+      "rate_percent": 20,
+      "rate_eur_cc": null,
+      "min_rate_eur_cc": 0.40
+    },
+    {
+      "audience": "PASSENGER_CAR_JUR_DIESEL",
+      "age_group": "5_to_7_years",
+      "unit": "percent",
+      "max_value": 1e18,
+      "rate_percent": 20,
+      "rate_eur_cc": null,
+      "min_rate_eur_cc": 0.80
     },
     {
       "audience": "PASSENGER_CAR_JUR_BENZ",
@@ -332,6 +459,15 @@
       "audience": "PASSENGER_CAR_JUR_BENZ",
       "age_group": "over_7_years",
       "unit": "eur_cc",
+      "max_value": 2800,
+      "rate_percent": null,
+      "rate_eur_cc": 2.2,
+      "min_rate_eur_cc": null
+    },
+    {
+      "audience": "PASSENGER_CAR_JUR_BENZ",
+      "age_group": "over_7_years",
+      "unit": "eur_cc",
       "max_value": 3000,
       "rate_percent": null,
       "rate_eur_cc": 2.2,
@@ -345,69 +481,6 @@
       "rate_percent": null,
       "rate_eur_cc": 3.2,
       "min_rate_eur_cc": null
-    },
-    {
-      "audience": "PASSENGER_CAR_JUR_DIESEL",
-      "age_group": "under_3_years",
-      "unit": "percent",
-      "max_value": 1e18,
-      "rate_percent": 15,
-      "rate_eur_cc": null,
-      "min_rate_eur_cc": 0.0
-    },
-    {
-      "audience": "PASSENGER_CAR_JUR_DIESEL",
-      "age_group": "3_to_5_years",
-      "unit": "percent",
-      "max_value": 1500,
-      "rate_percent": 20,
-      "rate_eur_cc": null,
-      "min_rate_eur_cc": 0.32
-    },
-    {
-      "audience": "PASSENGER_CAR_JUR_DIESEL",
-      "age_group": "3_to_5_years",
-      "unit": "percent",
-      "max_value": 2500,
-      "rate_percent": 20,
-      "rate_eur_cc": null,
-      "min_rate_eur_cc": 0.4
-    },
-    {
-      "audience": "PASSENGER_CAR_JUR_DIESEL",
-      "age_group": "3_to_5_years",
-      "unit": "percent",
-      "max_value": 1e18,
-      "rate_percent": 20,
-      "rate_eur_cc": null,
-      "min_rate_eur_cc": 0.8
-    },
-    {
-      "audience": "PASSENGER_CAR_JUR_DIESEL",
-      "age_group": "5_to_7_years",
-      "unit": "percent",
-      "max_value": 1500,
-      "rate_percent": 20,
-      "rate_eur_cc": null,
-      "min_rate_eur_cc": 0.32
-    },
-    {
-      "audience": "PASSENGER_CAR_JUR_DIESEL",
-      "age_group": "5_to_7_years",
-      "unit": "percent",
-      "max_value": 2500,
-      "rate_percent": 20,
-      "rate_eur_cc": null,
-      "min_rate_eur_cc": 0.4
-    },
-    {
-      "audience": "PASSENGER_CAR_JUR_DIESEL",
-      "age_group": "5_to_7_years",
-      "unit": "percent",
-      "max_value": 1e18,
-      "rate_percent": 20,
-      "rate_eur_cc": null,
-      "min_rate_eur_cc": 0.8
     },
     {
       "audience": "PASSENGER_CAR_JUR_DIESEL",
@@ -435,6 +508,231 @@
       "rate_percent": null,
       "rate_eur_cc": 3.2,
       "min_rate_eur_cc": null
+    },
+    {
+      "audience": "QUAD_PHYS",
+      "age_group": "under_3_years",
+      "unit": "percent_hp",
+      "max_value": 50,
+      "rate_percent": 25,
+      "rate_eur_hp": null,
+      "min_rate_eur_hp": 1.0
+    },
+    {
+      "audience": "QUAD_PHYS",
+      "age_group": "under_3_years",
+      "unit": "percent_hp",
+      "max_value": 1e18,
+      "rate_percent": 25,
+      "rate_eur_hp": null,
+      "min_rate_eur_hp": 2.0
+    },
+    {
+      "audience": "QUAD_PHYS",
+      "age_group": "over_5_years",
+      "unit": "eur_hp",
+      "max_value": 50,
+      "rate_percent": null,
+      "rate_eur_hp": 1.0,
+      "min_rate_eur_hp": null
+    },
+    {
+      "audience": "QUAD_PHYS",
+      "age_group": "over_5_years",
+      "unit": "eur_hp",
+      "max_value": 1e18,
+      "rate_percent": null,
+      "rate_eur_hp": 2.0,
+      "min_rate_eur_hp": null
+    },
+    {
+      "audience": "QUAD_JUR",
+      "age_group": "under_3_years",
+      "unit": "percent",
+      "max_value": 1e18,
+      "rate_percent": 15,
+      "rate_eur_cc": null,
+      "min_rate_eur_cc": null
+    },
+    {
+      "audience": "QUAD_JUR",
+      "age_group": "over_5_years",
+      "unit": "percent_hp",
+      "max_value": 1e18,
+      "rate_percent": 20,
+      "rate_eur_hp": null,
+      "min_rate_eur_hp": 0.5
+    },
+    {
+      "audience": "SNOWMOBILE_PHYS",
+      "age_group": "under_3_years",
+      "unit": "percent_hp",
+      "max_value": 100,
+      "rate_percent": 15,
+      "rate_eur_hp": null,
+      "min_rate_eur_hp": 1.5
+    },
+    {
+      "audience": "SNOWMOBILE_PHYS",
+      "age_group": "under_3_years",
+      "unit": "percent_hp",
+      "max_value": 1e18,
+      "rate_percent": 15,
+      "rate_eur_hp": null,
+      "min_rate_eur_hp": 3.0
+    },
+    {
+      "audience": "SNOWMOBILE_PHYS",
+      "age_group": "over_5_years",
+      "unit": "eur_hp",
+      "max_value": 100,
+      "rate_percent": null,
+      "rate_eur_hp": 1.5,
+      "min_rate_eur_hp": null
+    },
+    {
+      "audience": "SNOWMOBILE_PHYS",
+      "age_group": "over_5_years",
+      "unit": "eur_hp",
+      "max_value": 1e18,
+      "rate_percent": null,
+      "rate_eur_hp": 3.0,
+      "min_rate_eur_hp": null
+    },
+    {
+      "audience": "SNOWMOBILE_JUR",
+      "age_group": "under_3_years",
+      "unit": "percent",
+      "max_value": 1e18,
+      "rate_percent": 10,
+      "rate_eur_cc": null,
+      "min_rate_eur_cc": null
+    },
+    {
+      "audience": "SNOWMOBILE_JUR",
+      "age_group": "over_5_years",
+      "unit": "percent_hp",
+      "max_value": 1e18,
+      "rate_percent": 15,
+      "rate_eur_hp": null,
+      "min_rate_eur_hp": 1.0
+    },
+    {
+      "audience": "MOTORCYCLE_PHYS",
+      "age_group": "under_3_years",
+      "unit": "percent",
+      "max_value": 125,
+      "rate_percent": 10,
+      "rate_eur_cc": null,
+      "min_rate_eur_cc": 0.8
+    },
+    {
+      "audience": "MOTORCYCLE_PHYS",
+      "age_group": "under_3_years",
+      "unit": "percent",
+      "max_value": 500,
+      "rate_percent": 15,
+      "rate_eur_cc": null,
+      "min_rate_eur_cc": 1.0
+    },
+    {
+      "audience": "MOTORCYCLE_PHYS",
+      "age_group": "under_3_years",
+      "unit": "percent",
+      "max_value": 800,
+      "rate_percent": 20,
+      "rate_eur_cc": null,
+      "min_rate_eur_cc": 1.2
+    },
+    {
+      "audience": "MOTORCYCLE_PHYS",
+      "age_group": "under_3_years",
+      "unit": "percent",
+      "max_value": 1e18,
+      "rate_percent": 20,
+      "rate_eur_cc": null,
+      "min_rate_eur_cc": 1.5
+    },
+    {
+      "audience": "MOTORCYCLE_PHYS",
+      "age_group": "over_5_years",
+      "unit": "eur_cc",
+      "max_value": 125,
+      "rate_percent": null,
+      "rate_eur_cc": 0.8,
+      "min_rate_eur_cc": null
+    },
+    {
+      "audience": "MOTORCYCLE_PHYS",
+      "age_group": "over_5_years",
+      "unit": "eur_cc",
+      "max_value": 500,
+      "rate_percent": null,
+      "rate_eur_cc": 1.0,
+      "min_rate_eur_cc": null
+    },
+    {
+      "audience": "MOTORCYCLE_PHYS",
+      "age_group": "over_5_years",
+      "unit": "eur_cc",
+      "max_value": 800,
+      "rate_percent": null,
+      "rate_eur_cc": 1.2,
+      "min_rate_eur_cc": null
+    },
+    {
+      "audience": "MOTORCYCLE_PHYS",
+      "age_group": "over_5_years",
+      "unit": "eur_cc",
+      "max_value": 1e18,
+      "rate_percent": null,
+      "rate_eur_cc": 1.5,
+      "min_rate_eur_cc": null
+    },
+    {
+      "audience": "MOTORCYCLE_JUR",
+      "age_group": "under_3_years",
+      "unit": "percent",
+      "max_value": 1e18,
+      "rate_percent": 6,
+      "rate_eur_cc": null,
+      "min_rate_eur_cc": null
+    },
+    {
+      "audience": "MOTORCYCLE_JUR",
+      "age_group": "over_5_years",
+      "unit": "percent",
+      "max_value": 125,
+      "rate_percent": 10,
+      "rate_eur_cc": null,
+      "min_rate_eur_cc": 0.10
+    },
+    {
+      "audience": "MOTORCYCLE_JUR",
+      "age_group": "over_5_years",
+      "unit": "percent",
+      "max_value": 500,
+      "rate_percent": 10,
+      "rate_eur_cc": null,
+      "min_rate_eur_cc": 0.15
+    },
+    {
+      "audience": "MOTORCYCLE_JUR",
+      "age_group": "over_5_years",
+      "unit": "percent",
+      "max_value": 800,
+      "rate_percent": 10,
+      "rate_eur_cc": null,
+      "min_rate_eur_cc": 0.20
+    },
+    {
+      "audience": "MOTORCYCLE_JUR",
+      "age_group": "over_5_years",
+      "unit": "percent",
+      "max_value": 1e18,
+      "rate_percent": 10,
+      "rate_eur_cc": null,
+      "min_rate_eur_cc": 0.25
     }
   ],
   "util_fees": [
@@ -451,52 +749,52 @@
     {
       "kind": "commercial_under_3",
       "max_cc": 1000,
-      "coeff": 9.91
+      "coeff": 9.01
     },
     {
       "kind": "commercial_under_3",
       "max_cc": 2000,
-      "coeff": 37.07
+      "coeff": 33.37
     },
     {
       "kind": "commercial_under_3",
       "max_cc": 3000,
-      "coeff": 103.15
+      "coeff": 93.77
     },
     {
       "kind": "commercial_under_3",
       "max_cc": 3500,
-      "coeff": 118.44
+      "coeff": 107.67
     },
     {
       "kind": "commercial_under_3",
       "max_cc": 1e18,
-      "coeff": 150.82
+      "coeff": 137.11
     },
     {
       "kind": "commercial_over_3",
       "max_cc": 1000,
-      "coeff": 25.3
+      "coeff": 23.0
     },
     {
       "kind": "commercial_over_3",
       "max_cc": 2000,
-      "coeff": 64.57
+      "coeff": 58.7
     },
     {
       "kind": "commercial_over_3",
       "max_cc": 3000,
-      "coeff": 156.17
+      "coeff": 141.97
     },
     {
       "kind": "commercial_over_3",
       "max_cc": 3500,
-      "coeff": 236.87
+      "coeff": 164.84
     },
     {
       "kind": "commercial_over_3",
       "max_cc": 1e18,
-      "coeff": 301.64
+      "coeff": 180.24
     }
   ],
   "accise_rates": [
@@ -540,7 +838,7 @@
     },
     {
       "max_value_rub": 1200000,
-      "fee_rub": 5870
+      "fee_rub": 4269
     },
     {
       "max_value_rub": 2700000,
@@ -557,10 +855,6 @@
     {
       "max_value_rub": 7000000,
       "fee_rub": 27540
-    },
-    {
-      "max_value_rub": 10000000,
-      "fee_rub": 30000
     },
     {
       "max_value_rub": 1e18,

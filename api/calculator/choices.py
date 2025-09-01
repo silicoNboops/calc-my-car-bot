@@ -23,7 +23,6 @@ class AgeKey(models.TextChoices):
     FROM_3_TO_5 = "3_to_5", "3–5 лет"
     FROM_5_TO_7 = "5_to_7", "5–7 лет"
     OVER_7 = "over_7", "> 7 лет"
-    OVER_5 = "over_5", "> 5 лет"
 
 
 class Currency(models.TextChoices):

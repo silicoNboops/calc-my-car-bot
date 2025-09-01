@@ -62,6 +62,8 @@ class FuelType(Enum):
     DIESEL = "diesel"
     ELECTRIC = "electric"
     HYBRID = "hybrid"
+    DIESEL_ELECTRIC = "diesel_electric"  # дизельный и электрический
+    GASOLINE_ELECTRIC = "gasoline_electric"  # бензиновый и электрический
 
 
 @dataclass
@@ -79,6 +81,9 @@ class VehicleSpec:
     electric_power_hp: int = 0  # Мощность электро части для гибридов
     # Тип топлива/двигателя для ставок пошлины (юрлица)
     fuel_type: FuelType = FuelType.GASOLINE
+    # Параметры для новых гибридных типов
+    is_series_hybrid: bool = False  # Силовая установка последовательного типа
+    dvs_power_greater_than_electric: bool = False  # Мощность ДВС больше максимальной 30-минутной мощности ЭД
 
 
 @dataclass
@@ -497,6 +502,11 @@ def calc_excise(spec: VehicleSpec) -> float:
     Физические лица, покупающие автомобили для личного использования,
     освобождаются от уплаты акциза.
     Однако электромобили облагаются акцизом даже для физлиц личное использование.
+    
+    Новая логика для гибридов:
+    - Последовательный гибрид, ЭД ≥ ДВС → считаем как электромобиль (акциз по ЭД)
+    - Последовательный гибрид, ДВС > ЭД → считаем как ДВС (акциз по ДВС)
+    - Параллельный гибрид → считаем как ДВС (акциз по ДВС)
     """
     # Акциз применяется для легковых автомобилей и мотоциклов
     if spec.vehicle_type == VehicleType.MOTORCYCLE:
@@ -511,10 +521,30 @@ def calc_excise(spec: VehicleSpec) -> float:
         return 0.0
 
     # Обработка электромобилей
-    if spec.engine_type == EngineType.ELECTRIC:
+    if spec.engine_type == EngineType.ELECTRIC or spec.fuel_type == FuelType.ELECTRIC:
         # Электромобили облагаются акцизом даже для физлиц личное использование
         # Согласно electro_car_rules.txt
         return calc_excise_electric(spec.power_hp)
+
+    # Обработка новых гибридных типов
+    if spec.fuel_type in [FuelType.DIESEL_ELECTRIC, FuelType.GASOLINE_ELECTRIC]:
+        if spec.is_series_hybrid:
+            # Последовательный гибрид
+            if spec.dvs_power_greater_than_electric:
+                # ДВС > ЭД → считаем как ДВС
+                # Физические лица освобождены от акциза на ДВС
+                if spec.importer_type in (ImporterType.PHYS_PERSONAL, ImporterType.PHYS_RESALE):
+                    return 0.0
+                return calc_excise_flat(spec.power_hp)
+            else:
+                # ЭД ≥ ДВС → считаем как электромобиль
+                return calc_excise_electric(spec.power_hp)
+        else:
+            # Параллельный гибрид → считаем как ДВС
+            # Физические лица освобождены от акциза на ДВС
+            if spec.importer_type in (ImporterType.PHYS_PERSONAL, ImporterType.PHYS_RESALE):
+                return 0.0
+            return calc_excise_flat(spec.power_hp)
 
     # Физические лица (личное использование и перепродажа) освобождены от акциза на обычные автомобили (не электро)
     if spec.vehicle_type == VehicleType.CAR and spec.importer_type in (ImporterType.PHYS_PERSONAL,
@@ -522,14 +552,12 @@ def calc_excise(spec: VehicleSpec) -> float:
         return 0.0
 
     if spec.engine_type == EngineType.HYBRID_SERIES:
-        # Последовательный гибрид — по сумме мощностей ДВС + электро
-        total_power = spec.dvs_power_hp + spec.electric_power_hp
-        return calc_excise_flat(total_power)
+        # Последовательный гибрид — используем общую мощность
+        return calc_excise_flat(spec.power_hp)
 
     elif spec.engine_type == EngineType.HYBRID_PARALLEL:
-        # Параллельный гибрид — акциз только с мощности ДВС
-        dvs_power = spec.dvs_power_hp if spec.dvs_power_hp > 0 else int(spec.power_hp * 0.65)
-        return calc_excise_flat(dvs_power)
+        # Параллельный гибрид — используем общую мощность
+        return calc_excise_flat(spec.power_hp)
 
     else:
         # Для ДВС — расчет по диапазонам мощности (НК РФ ст. 193)
@@ -537,7 +565,8 @@ def calc_excise(spec: VehicleSpec) -> float:
 
 
 def calc_util_fee(vehicle_type: VehicleType, importer_type: ImporterType,
-                  age_years: int, engine_type: EngineType, engine_volume_cc: int) -> float:
+                  age_years: int, engine_type: EngineType, engine_volume_cc: int,
+                  spec: VehicleSpec = None) -> float:
     """Расчет утилизационного сбора"""
     # Для мотоциклов утилизационный сбор не платится
     if vehicle_type == VehicleType.MOTORCYCLE:
@@ -660,7 +689,24 @@ def calc_util_fee(vehicle_type: VehicleType, importer_type: ImporterType,
     else:
         # Для физлиц на перепродажу и юрлиц используем коммерческие коэффициенты
         if vehicle_key == 'car':
-            if engine_type == EngineType.ELECTRIC:
+            # Новая логика для гибридных типов
+            if spec and spec.fuel_type in [FuelType.DIESEL_ELECTRIC, FuelType.GASOLINE_ELECTRIC]:
+                if spec.is_series_hybrid:
+                    # Последовательный гибрид
+                    if spec.dvs_power_greater_than_electric:
+                        # ДВС > ЭД → считаем как ДВС (утилизационный сбор по объему ДВС)
+                        volume_table = RATES_2025['UTIL_COEFFS']['commercial'][vehicle_key][f"{age_key}_dvs_by_volume"]
+                        rate_info = find_rate_by_value(engine_volume_cc, volume_table, 'max_cc')
+                        coeff = rate_info['coeff']
+                    else:
+                        # ЭД ≥ ДВС → считаем как электромобиль (утилизационный сбор 3400/5200)
+                        coeff = RATES_2025['UTIL_COEFFS']['commercial'][vehicle_key][f"{age_key}_electric"]
+                else:
+                    # Параллельный гибрид → считаем как ДВС (утилизационный сбор по объему ДВС)
+                    volume_table = RATES_2025['UTIL_COEFFS']['commercial'][vehicle_key][f"{age_key}_dvs_by_volume"]
+                    rate_info = find_rate_by_value(engine_volume_cc, volume_table, 'max_cc')
+                    coeff = rate_info['coeff']
+            elif engine_type == EngineType.ELECTRIC:
                 coeff = RATES_2025['UTIL_COEFFS']['commercial'][vehicle_key][f"{age_key}_electric"]
             elif engine_type in [EngineType.HYBRID_SERIES, EngineType.HYBRID_PARALLEL]:
                 coeff = RATES_2025['UTIL_COEFFS']['commercial'][vehicle_key][f"{age_key}_hybrid"]
@@ -692,6 +738,18 @@ def calc_car_duty(spec: VehicleSpec, cost_eur: float) -> float:
     if spec.engine_type == EngineType.ELECTRIC or spec.fuel_type == FuelType.ELECTRIC:
         return cost_eur * 0.15
 
+    # Новая логика для гибридов
+    if spec.fuel_type in [FuelType.DIESEL_ELECTRIC, FuelType.GASOLINE_ELECTRIC]:
+        if spec.is_series_hybrid:
+            # Последовательный гибрид
+            if spec.dvs_power_greater_than_electric:
+                # ДВС > ЭД → считаем как ДВС (пошлина по объему ДВС)
+                pass  # продолжаем обычную логику ниже
+            else:
+                # ЭД ≥ ДВС → считаем как электромобиль (пошлина 15%)
+                return cost_eur * 0.15
+        # Параллельный гибрид → считаем как ДВС (пошлина по объему ДВС)
+
     # Физлица (личное и перепродажа) — ЕТС
     if spec.importer_type in (ImporterType.PHYS_PERSONAL, ImporterType.PHYS_RESALE):
         if spec.age_years < 3:
@@ -711,8 +769,8 @@ def calc_car_duty(spec: VehicleSpec, cost_eur: float) -> float:
             return spec.engine_volume_cc * rate_info['rate_eur_cc']
 
     # Юрлица
-    # Гибриды считаем по бензиновым правилам, объем — ДВС
-    is_diesel = (spec.fuel_type == FuelType.DIESEL)
+    # Определяем тип топлива для расчета пошлины
+    is_diesel = (spec.fuel_type in [FuelType.DIESEL, FuelType.DIESEL_ELECTRIC])
 
     if spec.age_years < 3:
         if is_diesel:
@@ -845,14 +903,19 @@ def calculate_customs_payments(spec: VehicleSpec) -> CalculationResult:
 
     # НДС (для юридических лиц и электромобилей для всех)
     vat_rub = 0.0
+    is_electric_for_vat = (spec.engine_type == EngineType.ELECTRIC or
+                           spec.fuel_type == FuelType.ELECTRIC or
+                           (spec.fuel_type in [FuelType.DIESEL_ELECTRIC, FuelType.GASOLINE_ELECTRIC] and
+                            spec.is_series_hybrid and not spec.dvs_power_greater_than_electric))
+
     if (spec.importer_type == ImporterType.JURIDICAL or
-            (spec.engine_type == EngineType.ELECTRIC and spec.vehicle_type == VehicleType.CAR)):
+            (is_electric_for_vat and spec.vehicle_type == VehicleType.CAR)):
         vat_base = cost_rub + duty_rub + excise_rub
         vat_rub = vat_base * RATES_2025['VAT_RATE']
 
     # Утилизационный сбор
     util_fee_rub = calc_util_fee(spec.vehicle_type, spec.importer_type,
-                                 spec.age_years, spec.engine_type, spec.engine_volume_cc)
+                                 spec.age_years, spec.engine_type, spec.engine_volume_cc, spec)
 
     # Таможенный сбор
     customs_fee_rub = calc_customs_fee(cost_rub, spec.importer_type)
@@ -879,12 +942,7 @@ def calculate_customs_payments(spec: VehicleSpec) -> CalculationResult:
             ImporterType.PHYS_RESALE: 'Физлицо (перепродажа)',
             ImporterType.JURIDICAL: 'Юридическое лицо'
         }[spec.importer_type],
-        'engine_type_ru': {
-            EngineType.DVS: 'ДВС',
-            EngineType.ELECTRIC: 'Электро',
-            EngineType.HYBRID_SERIES: 'Гибрид (последовательный)',
-            EngineType.HYBRID_PARALLEL: 'Гибрид (параллельный)'
-        }[spec.engine_type]
+        'engine_type_ru': get_engine_type_description(spec)
     }
 
     return CalculationResult(
@@ -897,6 +955,35 @@ def calculate_customs_payments(spec: VehicleSpec) -> CalculationResult:
         total_rub=total_rub,
         breakdown=breakdown
     )
+
+
+def get_engine_type_description(spec: VehicleSpec) -> str:
+    """Получение описания типа двигателя"""
+    if spec.fuel_type == FuelType.ELECTRIC:
+        return 'Электро'
+    elif spec.fuel_type == FuelType.DIESEL_ELECTRIC:
+        if spec.is_series_hybrid:
+            if spec.dvs_power_greater_than_electric:
+                return 'Дизель+Электро (последовательный, ДВС>ЭД)'
+            else:
+                return 'Дизель+Электро (последовательный, ЭД≥ДВС)'
+        else:
+            return 'Дизель+Электро (параллельный)'
+    elif spec.fuel_type == FuelType.GASOLINE_ELECTRIC:
+        if spec.is_series_hybrid:
+            if spec.dvs_power_greater_than_electric:
+                return 'Бензин+Электро (последовательный, ДВС>ЭД)'
+            else:
+                return 'Бензин+Электро (последовательный, ЭД≥ДВС)'
+        else:
+            return 'Бензин+Электро (параллельный)'
+    elif spec.engine_type == EngineType.HYBRID_SERIES:
+        return 'Гибрид (последовательный)'
+    elif spec.engine_type == EngineType.HYBRID_PARALLEL:
+        return 'Гибрид (параллельный)'
+    else:
+        # Для обычных ДВС возвращаем общее "ДВС" для совместимости с тестами
+        return 'ДВС'
 
 
 def format_currency(amount: float) -> str:
@@ -1034,25 +1121,34 @@ def start_interactive() -> VehicleSpec:
     age = int(_prompt_number("Возраст ТС (лет)", int))
 
     # Базовый выбор топлива/природы двигателя
-    base_fuel = _prompt_choice("Тип двигателя (по топливу)", ['gasoline', 'diesel', 'electric'], default_index=0)
+    base_fuel = _prompt_choice("Тип двигателя (по топливу)",
+                               ['gasoline', 'diesel', 'electric', 'diesel_electric', 'gasoline_electric'],
+                               default_index=0)
 
     # Определяем архитектуру двигателя и топливо
     engine_type = EngineType.DVS
     fuel_type = FuelType.GASOLINE
-    is_hybrid = False
+    is_series_hybrid = False
+    dvs_power_greater_than_electric = False
+
     if base_fuel == 'electric':
         engine_type = EngineType.ELECTRIC
         fuel_type = FuelType.ELECTRIC
+    elif base_fuel in ['diesel_electric', 'gasoline_electric']:
+        # Новые гибридные типы - сразу спрашиваем параметры гибрида
+        fuel_type = FuelType.DIESEL_ELECTRIC if base_fuel == 'diesel_electric' else FuelType.GASOLINE_ELECTRIC
+        engine_type = EngineType.DVS  # Базовый тип для расчетов
+
+        # Спрашиваем про последовательную установку
+        is_series_hybrid = _prompt_yes_no("Силовая установка последовательного типа?", default=False)
+
+        # Спрашиваем про соотношение мощностей (актуально для всех гибридов)
+        dvs_power_greater_than_electric = _prompt_yes_no(
+            "Мощность ДВС больше максимальной 30-минутной мощности ЭД?", default=False)
     else:
-        # gasoline / diesel
+        # gasoline / diesel - обычные ДВС (НЕ гибриды)
         fuel_type = FuelType.GASOLINE if base_fuel == 'gasoline' else FuelType.DIESEL
-        is_hybrid = _prompt_yes_no("Гибридный?", default=False)
-        if is_hybrid:
-            arch = _prompt_choice("Тип гибридной системы", ['hybrid_series', 'hybrid_parallel'], default_index=1)
-            engine_type = EngineType.HYBRID_SERIES if arch == 'hybrid_series' else EngineType.HYBRID_PARALLEL
-            fuel_type = FuelType.HYBRID
-        else:
-            engine_type = EngineType.DVS
+        engine_type = EngineType.DVS
 
     # Объем двигателя (для электричек = 0)
     if engine_type == EngineType.ELECTRIC:
@@ -1062,22 +1158,14 @@ def start_interactive() -> VehicleSpec:
 
     # Мощность запрашиваем для всех типов ТС (нужна для расчета пошлин и акцизов)
     power = 0
-    dvs_power = 0
-    el_power = 0
     if type_map[vt] in [VehicleType.CAR, VehicleType.MOTORCYCLE, VehicleType.QUAD, VehicleType.SNOWMOBILE]:
         # Для всех ТС мощность важна для расчета пошлин
         power_float = _prompt_number("Мощность (л.с.)", float)
         # Для расчетов используем целое число, округляя вверх для дробных значений
         power = int(power_float) if power_float == int(power_float) else int(power_float) + 1
-        if engine_type == EngineType.HYBRID_SERIES and type_map[vt] == VehicleType.CAR:
-            dvs_power_float = _prompt_number("Мощность ДВС части (л.с.)", float)
-            dvs_power = int(dvs_power_float) if dvs_power_float == int(dvs_power_float) else int(dvs_power_float) + 1
-            el_power_float = _prompt_number("Мощность электрической части (л.с.)", float)
-            el_power = int(el_power_float) if el_power_float == int(el_power_float) else int(el_power_float) + 1
-        elif engine_type == EngineType.HYBRID_PARALLEL and type_map[vt] == VehicleType.CAR:
-            # Для параллельного важна хотя бы мощность ДВС для точности
-            dvs_power_float = _prompt_number("Мощность ДВС части (л.с.)", float)
-            dvs_power = int(dvs_power_float) if dvs_power_float == int(dvs_power_float) else int(dvs_power_float) + 1
+
+        # Для гибридных типов используем общую мощность автомобиля
+        # Детальные мощности ДВС и ЭД не запрашиваем - они не влияют на расчет
 
     spec = VehicleSpec(
         vehicle_type=type_map[vt],
@@ -1088,9 +1176,9 @@ def start_interactive() -> VehicleSpec:
         engine_volume_cc=volume,
         power_hp=power,
         engine_type=engine_type,
-        dvs_power_hp=dvs_power,
-        electric_power_hp=el_power,
-        fuel_type=fuel_type
+        fuel_type=fuel_type,
+        is_series_hybrid=is_series_hybrid,
+        dvs_power_greater_than_electric=dvs_power_greater_than_electric
     )
 
     # Валидация простых несоответствий
@@ -1139,12 +1227,18 @@ def main():
                         help='Мощность в л.с.')
     parser.add_argument('--engine', choices=['dvs', 'electric', 'hybrid', 'hybrid_series', 'hybrid_parallel'],
                         help='Тип двигателя (hybrid = hybrid_parallel для совместимости)')
-    parser.add_argument('--fuel', choices=['gasoline', 'diesel', 'electric', 'hybrid'], default='gasoline',
+    parser.add_argument('--fuel',
+                        choices=['gasoline', 'diesel', 'electric', 'hybrid', 'diesel_electric', 'gasoline_electric'],
+                        default='gasoline',
                         help='Тип топлива для ставок пошлины (primarily for juridical)')
     parser.add_argument('--dvs-power', type=int, default=0,
                         help='Мощность ДВС части для гибридов (л.с.)')
     parser.add_argument('--electric-power', type=int, default=0,
                         help='Мощность электро части для гибридов (л.с.)')
+    parser.add_argument('--series-hybrid', action='store_true',
+                        help='Силовая установка последовательного типа')
+    parser.add_argument('--dvs-greater-electric', action='store_true',
+                        help='Мощность ДВС больше максимальной 30-минутной мощности ЭД')
     parser.add_argument('--update-rates', action='store_true',
                         help='Обновить курсы валют и выйти')
     parser.add_argument('--interactive', action='store_true',
@@ -1195,7 +1289,9 @@ def main():
             engine_type=EngineType(engine_type),
             dvs_power_hp=args.dvs_power,
             electric_power_hp=args.electric_power,
-            fuel_type=FuelType(args.fuel)
+            fuel_type=FuelType(args.fuel),
+            is_series_hybrid=args.series_hybrid,
+            dvs_power_greater_than_electric=args.dvs_greater_electric
         )
 
         # Валидация

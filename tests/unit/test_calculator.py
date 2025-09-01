@@ -1,19 +1,18 @@
 from __future__ import annotations
 
 import pytest
-from django.urls import reverse
 from django.core.management import call_command
+from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
 
+from api.calculator.models import DutyRate, Audience, AgeGroup, DutyUnit, CustomsFee
 from api.calculator.serializers import EstimateRequestSerializer
 from api.calculator.services import (
     CalculatorService,
-    CbrfCurrencyProvider,
     EstimateInput,
     get_default_currency_provider,
 )
-from api.calculator.models import DutyRate, Audience, AgeGroup, DutyUnit, CustomsFee
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -26,8 +25,9 @@ def _seed_customs_rates(django_db_setup, django_db_blocker):  # type: ignore[no-
     with django_db_blocker.unblock():
         call_command("seed_customs_rates", "--replace", "--path", "api/calculator/fixtures")
 
+
 @pytest.mark.django_db()
-def test_serializer_age_key_forbidden_over5_for_jur() -> None:
+def test_serializer_normalizes_legacy_over5_to_5_to_7_for_jur() -> None:
     s = EstimateRequestSerializer(data={
         "price": 10000,
         "currency": "EUR",
@@ -37,12 +37,12 @@ def test_serializer_age_key_forbidden_over5_for_jur() -> None:
         "age_key": "over_5",
         "is_jur": True,
     })
-    assert not s.is_valid()
-    assert "age_key" in s.errors
+    assert s.is_valid(), s.errors
+    assert s.validated_data["age_key"] == "5_to_7"
 
 
 @pytest.mark.django_db()
-def test_serializer_normalizes_phys_over7_to_over5() -> None:
+def test_serializer_keeps_phys_over7() -> None:
     s = EstimateRequestSerializer(data={
         "price": 10000,
         "currency": "EUR",
@@ -53,7 +53,7 @@ def test_serializer_normalizes_phys_over7_to_over5() -> None:
         "is_jur": False,
     })
     assert s.is_valid(), s.errors
-    assert s.validated_data["age_key"] == "over_5"
+    assert s.validated_data["age_key"] == "over_7"
     # is_personal_use should default to not is_jur
     assert s.validated_data["is_personal_use"] is True
 
@@ -63,7 +63,8 @@ def test_boundary_phys_under3_price_bracket_duty_exact_max() -> None:
     # Берём первый брекет по цене для физлиц <3 лет
     row = (
         DutyRate.objects
-        .filter(audience=Audience.PASSENGER_CAR_PHYS, age_group=AgeGroup.UNDER_3, unit__in=[DutyUnit.PERCENT, DutyUnit.VALUE])
+        .filter(audience=Audience.PASSENGER_CAR_PHYS, age_group=AgeGroup.UNDER_3,
+                unit__in=[DutyUnit.PERCENT, DutyUnit.VALUE])
         .order_by("max_value")
         .first()
     )
@@ -159,8 +160,8 @@ def test_boundary_customs_fee_exact_max_value_rub() -> None:
 
 
 @pytest.mark.django_db()
-def test_ev_phys_under3_basic_v3_rules() -> None:
-    """Физлицо, электро, <3 лет: duty = 15% от цены (EUR), accise=0, VAT=0, util=3400, customs_fee — по таблице."""
+def test_ev_phys_under3_basic_v5_rules() -> None:
+    """Физлицо, электро, <3 лет (v5): duty=15% EUR; accise=9150; VAT=0; util=3400; customs_fee — по таблице."""
     client = APIClient()
     payload = {
         "price": 20000.0,  # EUR
@@ -179,8 +180,9 @@ def test_ev_phys_under3_basic_v3_rules() -> None:
     assert pytest.approx(data["duty_eur"], rel=1e-6) == 3000.0
     # util_fee = 20_000 * 0.17 = 3400
     assert pytest.approx(data["util_fee"], rel=1e-6) == 3400.0
-    # accise и VAT = 0 для физ личного использования
-    assert data["accise_rub"] == 0.0
+    # v5: EV облагается акцизом по ставке 61 руб/л.с. для 150 л.с. => 9150
+    assert pytest.approx(data["accise_rub"], rel=1e-6) == 9150.0
+    # Для физлиц VAT = 0
     assert data["vat_rub"] == 0.0
     # customs_fee — по таблице ПП РФ №1637 в зависимости от price_rub
     rows = list(CustomsFee.objects.order_by("max_value_rub"))
@@ -230,7 +232,7 @@ def test_hybrid_parallel_jur_over5_min_rule() -> None:
 
 @pytest.mark.django_db()
 def test_ev_phys_over5_rules() -> None:
-    """Физлицо, электро, >=3 лет (v4 по умолчанию): duty = 15% от цены; VAT=0; accise=0; util=5200; customs_fee — по таблице."""
+    """Физлицо, электро, >=3 лет (v5): duty=15% EUR; accise=9150; VAT=0; util=5200; customs_fee — по таблице."""
     client = APIClient()
     payload = {
         "price": 10000.0,
@@ -249,7 +251,8 @@ def test_ev_phys_over5_rules() -> None:
     assert pytest.approx(data["duty_eur"], rel=1e-6) == 1500.0
     # util_fee = 5200 (старше 3 лет для ФЛ)
     assert pytest.approx(data["util_fee"], rel=1e-6) == 5200.0
-    assert data["accise_rub"] == 0.0
+    # v5: EV облагается акцизом по ставке 61 руб/л.с. для 150 л.с. => 9150
+    assert pytest.approx(data["accise_rub"], rel=1e-6) == 9150.0
     assert data["vat_rub"] == 0.0
     # customs_fee — по таблице ПП РФ №1637 в зависимости от price_rub
     rows = list(CustomsFee.objects.order_by("max_value_rub"))

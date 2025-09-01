@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 import logging
 import os
 from dataclasses import dataclass
@@ -26,6 +27,15 @@ from api.calculator.models import (
     DutyRate,
     Settings,
     UtilFee,
+)
+# V5 legacy calculator (single source of calculation truth)
+from calculator_v2.customs_calculator_v6 import (
+    VehicleType as V5VehicleType,
+    ImporterType as V5ImporterType,
+    EngineType as V5EngineType,
+    VehicleSpec as V5VehicleSpec,
+    calculate_customs_payments as v5_calculate,
+    RatesFetcher as V5RatesFetcher,
 )
 
 # Используем Django TextChoices как единый источник истины.
@@ -208,7 +218,8 @@ class CustomsCalculator:
         else:
             g = AgeGroup.UNDER_3 if age_key == AgeKeyChoices.UNDER_3 else AgeGroup.OVER_5
             if g == AgeGroup.UNDER_3:
-                rows = list(self.duty_rates.filter(audience=Audience.SNOWMOBILE_JUR, age_group=g, unit=DutyUnit.PERCENT))
+                rows = list(
+                    self.duty_rates.filter(audience=Audience.SNOWMOBILE_JUR, age_group=g, unit=DutyUnit.PERCENT))
                 if not rows:
                     return 0.0
                 rate_percent = float(rows[0].rate_percent or 0.0)
@@ -230,8 +241,10 @@ class CustomsCalculator:
         if not is_jur:
             g = AgeGroup.UNDER_3 if age_key == AgeKeyChoices.UNDER_3 else AgeGroup.OVER_5
             if g == AgeGroup.UNDER_3:
-                rows = self.duty_rates.filter(audience=Audience.MOTORCYCLE_PHYS, age_group=g, unit=DutyUnit.PERCENT).order_by("max_value")
-                table = [{"max_cc": float(r.max_value or float("inf")), "rate_percent": float(r.rate_percent or 0.0), "min_rate_eur_cc": float(r.min_rate_eur_cc or 0.0)} for r in rows]
+                rows = self.duty_rates.filter(audience=Audience.MOTORCYCLE_PHYS, age_group=g,
+                                              unit=DutyUnit.PERCENT).order_by("max_value")
+                table = [{"max_cc": float(r.max_value or float("inf")), "rate_percent": float(r.rate_percent or 0.0),
+                          "min_rate_eur_cc": float(r.min_rate_eur_cc or 0.0)} for r in rows]
                 if not table:
                     return 0.0
                 row = self._find_bracket(cc, table, "max_cc")
@@ -240,8 +253,10 @@ class CustomsCalculator:
                     rate_percent /= 100.0
                 return max(price_eur * rate_percent, cc * float(row.get("min_rate_eur_cc", 0.0)))
             else:
-                rows = self.duty_rates.filter(audience=Audience.MOTORCYCLE_PHYS, age_group=g, unit=DutyUnit.EUR_CC).order_by("max_value")
-                table = [{"max_cc": float(r.max_value or float("inf")), "rate_eur_cc": float(r.rate_eur_cc or 0.0)} for r in rows]
+                rows = self.duty_rates.filter(audience=Audience.MOTORCYCLE_PHYS, age_group=g,
+                                              unit=DutyUnit.EUR_CC).order_by("max_value")
+                table = [{"max_cc": float(r.max_value or float("inf")), "rate_eur_cc": float(r.rate_eur_cc or 0.0)} for
+                         r in rows]
                 if not table:
                     return 0.0
                 row = self._find_bracket(cc, table, "max_cc")
@@ -249,7 +264,8 @@ class CustomsCalculator:
         else:
             g = AgeGroup.UNDER_3 if age_key == AgeKeyChoices.UNDER_3 else AgeGroup.OVER_5
             if g == AgeGroup.UNDER_3:
-                rows = list(self.duty_rates.filter(audience=Audience.MOTORCYCLE_JUR, age_group=g, unit=DutyUnit.PERCENT))
+                rows = list(
+                    self.duty_rates.filter(audience=Audience.MOTORCYCLE_JUR, age_group=g, unit=DutyUnit.PERCENT))
                 if not rows:
                     return 0.0
                 rate_percent = float(rows[0].rate_percent or 0.0)
@@ -257,8 +273,10 @@ class CustomsCalculator:
                     rate_percent /= 100.0
                 return price_eur * rate_percent
             else:
-                rows = self.duty_rates.filter(audience=Audience.MOTORCYCLE_JUR, age_group=g, unit=DutyUnit.PERCENT).order_by("max_value")
-                table = [{"max_cc": float(r.max_value or float("inf")), "rate_percent": float(r.rate_percent or 0.0), "min_rate_eur_cc": float(r.min_rate_eur_cc or 0.0)} for r in rows]
+                rows = self.duty_rates.filter(audience=Audience.MOTORCYCLE_JUR, age_group=g,
+                                              unit=DutyUnit.PERCENT).order_by("max_value")
+                table = [{"max_cc": float(r.max_value or float("inf")), "rate_percent": float(r.rate_percent or 0.0),
+                          "min_rate_eur_cc": float(r.min_rate_eur_cc or 0.0)} for r in rows]
                 if not table:
                     return 0.0
                 row = self._find_bracket(cc, table, "max_cc")
@@ -267,13 +285,15 @@ class CustomsCalculator:
                     rate_percent /= 100.0
                 return max(price_eur * rate_percent, cc * float(row.get("min_rate_eur_cc", 0.0)))
 
-    def _calc_duty(self, price_eur: float, engine_cc: int, age_key: AgeKey, is_jur: bool, engine_type: EngineType) -> float:
+    def _calc_duty(self, price_eur: float, engine_cc: int, age_key: AgeKey, is_jur: bool,
+                   engine_type: EngineType) -> float:
         if not is_jur:
             # PASSENGER_CAR_PHYS
             group_map: dict[AgeKey, AgeGroup] = {
                 AgeKeyChoices.UNDER_3: AgeGroup.UNDER_3,
                 AgeKeyChoices.FROM_3_TO_5: AgeGroup.FROM_3_TO_5,
-                AgeKeyChoices.OVER_5: AgeGroup.OVER_5,
+                AgeKeyChoices.FROM_5_TO_7: AgeGroup.OVER_5,
+                AgeKeyChoices.OVER_7: AgeGroup.OVER_5,
             }
             g = group_map.get(age_key, AgeGroup.UNDER_3)
             rows = self._collect_duty_rows(Audience.PASSENGER_CAR_PHYS, g)
@@ -317,9 +337,13 @@ class CustomsCalculator:
                 row = self._find_bracket(engine_cc, rows, "max_cc")
                 return engine_cc * float(row.get("rate_eur_cc", 0.0))
 
-    def _calc_util(self, is_commercial: bool, age_key: AgeKey, engine_cc: int, engine_type: EngineType, vehicle_type: VehicleType = VehicleTypeChoices.CAR) -> float:
+    def _calc_util(self, is_commercial: bool, age_key: AgeKey, engine_cc: int, engine_type: EngineType,
+                   vehicle_type: VehicleType = VehicleTypeChoices.CAR) -> float:
         # util_base хранится в Settings (fallback к 20000.0 при отсутствии)
         util_base = float(getattr(self.settings, "util_base", 20000.0) or 20000.0)
+        # По требованиям оригинального калькулятора: для мотоциклов и снегоходов утильсбор всегда 0
+        if vehicle_type in (VehicleTypeChoices.MOTORCYCLE, VehicleTypeChoices.SNOWMOBILE):
+            return 0.0
         if not is_commercial and vehicle_type == VehicleTypeChoices.CAR:
             # Берём детерминированно запись с max_cc IS NULL из боевых фикстур
             # (избегаем влияния шаблонных фикстур и сортировки NULL в разных СУБД)
@@ -342,9 +366,9 @@ class CustomsCalculator:
         else:
             # EV/Hybrid коммерческий: по v2 фиксированные коэффициенты, не зависящие от объёма
             if vehicle_type == VehicleTypeChoices.CAR and engine_type in (
-                EngineTypeChoices.ELECTRO,
-                EngineTypeChoices.HYBRID_SERIES,
-                EngineTypeChoices.HYBRID_PARALLEL,
+                    EngineTypeChoices.ELECTRO,
+                    EngineTypeChoices.HYBRID_SERIES,
+                    EngineTypeChoices.HYBRID_PARALLEL,
             ):
                 if age_key == AgeKeyChoices.UNDER_3:
                     coeff = 1.42  # new_electric/new_hybrid
@@ -366,18 +390,28 @@ class CustomsCalculator:
             row = self._find_bracket(engine_cc, table, "max_cc")
             return util_base * float(row.get("coeff", 0.0))
 
-    def _calc_accise(self, hp: int, is_commercial: bool, engine_type: EngineType, dvs_hp: int | None = None, electric_hp: int | None = None) -> float:
-        if not is_commercial:
-            return 0.0
-        # Определяем мощность для расчёта по v2
+    def _calc_accise(self, hp: int, is_commercial: bool, engine_type: EngineType, dvs_hp: int | None = None,
+                     electric_hp: int | None = None) -> float:
+        """Акциз по v5.
+
+        - EV: прогрессивный акциз по мощности применяется всегда (включая ФЛ личное использование).
+        - Прочие типы: как ранее, акциз только для коммерции/юрлиц.
+        - Для гибридов определяем мощность согласно типу гибрида (серийный: сумма, параллельный: dvs_hp или 65% от hp).
+        Ставки берём из таблицы AcciseRate (руб/л.с. по брекетам max_hp).
+        """
+        # EV — всегда считаем по прогрессивной шкале
         if engine_type == EngineTypeChoices.ELECTRO:
-            power_for_tax = hp
-        elif engine_type == EngineTypeChoices.HYBRID_SERIES:
-            power_for_tax = int((dvs_hp or 0) + (electric_hp or 0))
-        elif engine_type == EngineTypeChoices.HYBRID_PARALLEL:
-            power_for_tax = int(dvs_hp if dvs_hp is not None else int(hp * 0.65))
+            power_for_tax = int(hp)
         else:
-            power_for_tax = hp
+            # Для не-EV: применяем акциз только для коммерции
+            if not is_commercial:
+                return 0.0
+            if engine_type == EngineTypeChoices.HYBRID_SERIES:
+                power_for_tax = int((dvs_hp or 0) + (electric_hp or 0))
+            elif engine_type == EngineTypeChoices.HYBRID_PARALLEL:
+                power_for_tax = int(dvs_hp if dvs_hp is not None else int(hp * 0.65))
+            else:
+                power_for_tax = int(hp)
 
         rows = list(self.accise_rates.order_by("max_hp"))
         table = [{"max_hp": float(r.max_hp), "rate": float(r.rate_rub_per_hp)} for r in rows]
@@ -401,83 +435,91 @@ class CustomsCalculator:
         return float(row.get("fee", 0.0))
 
     def estimate(self, data: EstimateInput) -> EstimateResult:
-        # Конвертация валют (как в legacy): fx — RUB за единицу валюты
-        fx = self.currency_rates
-        # Нормализация входных значений: допускаем как TextChoices, так и строки
+        """Полная переадресация расчёта в legacy V5 калькулятор.
+
+        1) Переносим входные данные EstimateInput -> V5 VehicleSpec.
+        2) Подсовываем курсы валют из текущего провайдера в кэш V5 RatesFetcher,
+           чтобы избежать сетевых запросов и обеспечить детерминизм.
+        3) Вызываем v5_calculate(...) и маппим результат в EstimateResult.
+        """
+
+        # 1) Нормализуем перечисления (допускаем строки)
         cur = data.currency if not isinstance(data.currency, str) else CurrencyChoices(data.currency)
         veh = data.vehicle_type if not isinstance(data.vehicle_type, str) else VehicleTypeChoices(data.vehicle_type)
         eng = data.engine_type if not isinstance(data.engine_type, str) else EngineTypeChoices(data.engine_type)
         age = data.age_key if not isinstance(data.age_key, str) else AgeKeyChoices(data.age_key)
 
-        if cur.value not in fx:
-            msg = f"Unsupported currency: {data.currency}"
-            raise ValueError(msg)
-        price_rub = float(data.price) * float(fx[cur.value])
-        price_eur = price_rub / float(fx.get(CurrencyChoices.EUR.value, 1.0))
+        # 2) Курсы валют: кладём в кэш V5
+        fx = dict(self.currency_rates)
+        V5RatesFetcher._cache = {k.upper(): float(v) for k, v in fx.items()}
+        V5RatesFetcher._cache["RUB"] = float(V5RatesFetcher._cache.get("RUB", 1.0))
+        V5RatesFetcher._cache_time = datetime.datetime.now()
 
-        is_commercial = data.is_jur or (data.is_personal_use is False)
-
-        # Пошлина: зависит от vehicle_type
-        if veh == VehicleTypeChoices.CAR:
-            if not data.is_jur:
-                # ФЛ: для EV — v4 15% всегда; гибриды — как было ранее для ФЛ
-                if eng == EngineTypeChoices.ELECTRO:
-                    duty_eur = price_eur * 0.15
-                elif eng in (EngineTypeChoices.HYBRID_SERIES, EngineTypeChoices.HYBRID_PARALLEL):
-                    if age == AgeKeyChoices.UNDER_3:
-                        rate = 0.15
-                        min_eur_cc = 0.0
-                        duty_from_price = price_eur * rate
-                        duty_from_volume = int(data.engine_cc) * min_eur_cc
-                        duty_eur = max(duty_from_price, duty_from_volume)
-                    else:
-                        rate_eur_cc = 1.0
-                        duty_eur = int(data.engine_cc) * rate_eur_cc
-                else:
-                    duty_eur = self._calc_duty(price_eur, int(data.engine_cc), age, data.is_jur, eng)
-            else:
-                # ЮЛ: EV — 15% от стоимости; гибриды — как бензин по таблицам; иное — по таблицам
-                if eng == EngineTypeChoices.ELECTRO:
-                    duty_eur = price_eur * 0.15
-                elif eng in (EngineTypeChoices.HYBRID_SERIES, EngineTypeChoices.HYBRID_PARALLEL):
-                    duty_eur = self._calc_duty(price_eur, int(data.engine_cc), age, data.is_jur, EngineTypeChoices.BENZIN)
-                else:
-                    duty_eur = self._calc_duty(price_eur, int(data.engine_cc), age, data.is_jur, eng)
-        elif veh == VehicleTypeChoices.QUAD:
-            duty_eur = self._calc_duty_quad(price_eur, int(data.hp), age, data.is_jur)
-        elif veh == VehicleTypeChoices.SNOWMOBILE:
-            duty_eur = self._calc_duty_snowmobile(price_eur, int(data.hp), age, data.is_jur)
-        elif veh == VehicleTypeChoices.MOTORCYCLE:
-            duty_eur = self._calc_duty_motorcycle(price_eur, int(data.engine_cc), age, data.is_jur)
+        # 3) Маппинг импортёра
+        if data.is_jur:
+            importer = V5ImporterType.JURIDICAL
         else:
-            duty_eur = 0.0
-        duty_rub = duty_eur * float(fx.get(CurrencyChoices.EUR.value, 1.0))
-
-        util_fee = self._calc_util(is_commercial, age, int(data.engine_cc), eng, veh)
-        # Акциз: только для легковых автомобилей. Для EV (v4) — всегда 0.
-        if veh == VehicleTypeChoices.CAR:
-            if eng == EngineTypeChoices.ELECTRO:
-                accise_rub = 0.0
+            if data.is_personal_use is False:
+                importer = V5ImporterType.PHYS_RESALE
             else:
-                accise_rub = self._calc_accise(int(data.hp), is_commercial, eng, data.dvs_hp, data.electric_hp)
-        else:
-            accise_rub = 0.0
-        vat_rub = self._calc_vat(price_rub, duty_rub, accise_rub, is_commercial)
-        # Таможенный сбор по v3: всегда по таблице ПП РФ №1637
-        customs_fee = self._calc_customs_fee(price_rub)
+                importer = V5ImporterType.PHYS_PERSONAL
 
-        subtotal_customs = duty_rub + util_fee + accise_rub + vat_rub + customs_fee
+        # 4) Маппинг типов
+        v5_vehicle = {
+            VehicleTypeChoices.CAR: V5VehicleType.CAR,
+            VehicleTypeChoices.QUAD: V5VehicleType.QUAD,
+            VehicleTypeChoices.SNOWMOBILE: V5VehicleType.SNOWMOBILE,
+            VehicleTypeChoices.MOTORCYCLE: V5VehicleType.MOTORCYCLE,
+        }[veh]
+
+        v5_engine = {
+            EngineTypeChoices.ELECTRO: V5EngineType.ELECTRIC,
+            EngineTypeChoices.HYBRID_SERIES: V5EngineType.HYBRID_SERIES,
+            EngineTypeChoices.HYBRID_PARALLEL: V5EngineType.HYBRID_PARALLEL,
+        }.get(eng, V5EngineType.DVS)
+
+        # 5) Возраст в годах для V5
+        def _age_years(a: AgeKeyChoices) -> int:
+            if a == AgeKeyChoices.UNDER_3:
+                return 1
+            if a == AgeKeyChoices.FROM_3_TO_5:
+                return 4
+            # Всё, что старше 5 лет (5–7 и >7), трактуем как 6 для V5 совместимости
+            return 6
+
+        # 6) Собираем спеку V5
+        spec = V5VehicleSpec(
+            vehicle_type=v5_vehicle,
+            importer_type=importer,
+            cost_original=float(data.price),
+            currency=str(cur.value),
+            age_years=_age_years(age),
+            engine_volume_cc=int(data.engine_cc),
+            power_hp=int(data.hp or 0),
+            engine_type=v5_engine,
+            dvs_power_hp=int(data.dvs_hp or 0),
+            electric_power_hp=int(data.electric_hp or 0),
+        )
+
+        # 7) Вызываем V5 калькулятор
+        v5_res = v5_calculate(spec)
+
+        # 8) Маппим ответ V5 -> EstimateResult
+        # price_eur берём из breakdown, если есть; иначе пересчитываем из курса
+        bd = v5_res.breakdown or {}
+        eur_rate = float(bd.get("eur_rate") or fx.get("EUR") or 1.0)
+        price_eur = float(bd.get("cost_eur")) if "cost_eur" in bd else float(v5_res.cost_rub) / float(eur_rate)
 
         return EstimateResult(
-            price_rub=price_rub,
-            price_eur=price_eur,
-            duty_eur=duty_eur,
-            duty_rub=duty_rub,
-            util_fee=util_fee,
-            accise_rub=accise_rub,
-            vat_rub=vat_rub,
-            customs_fee=customs_fee,
-            subtotal_customs=subtotal_customs,
+            price_rub=float(v5_res.cost_rub),
+            price_eur=float(price_eur),
+            duty_eur=float(bd.get("duty_eur", 0.0)),
+            duty_rub=float(v5_res.duty_rub),
+            util_fee=float(v5_res.util_fee_rub),
+            accise_rub=float(v5_res.excise_rub),
+            vat_rub=float(v5_res.vat_rub),
+            customs_fee=float(v5_res.customs_fee_rub),
+            subtotal_customs=float(v5_res.total_rub),
         )
 
 
