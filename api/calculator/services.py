@@ -29,7 +29,7 @@ from api.calculator.models import (
     UtilFee,
 )
 # V5 legacy calculator (single source of calculation truth)
-from calculator.customs_calculator_v5 import (
+from calculator_v2.customs_calculator_v6 import (
     VehicleType as V5VehicleType,
     ImporterType as V5ImporterType,
     EngineType as V5EngineType,
