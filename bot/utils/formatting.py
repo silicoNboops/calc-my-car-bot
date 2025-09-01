@@ -5,13 +5,19 @@ from datetime import datetime
 from typing import Optional
 
 from bot.keyboards.calculator import (
-    # kept for potential future use
-    format_currency_title,
     format_engine_type_title,
     format_importer_kind_title,
     format_vehicle_title,
-    get_currency_flag,
 )
+from bot.utils.currency import (
+    get_currency_flag,
+    format_currency_title,
+)
+
+RATES_ORDER: tuple[str, ...] = ("EUR", "USD", "CNY", "KRW", "JPY")
+PRECISION_BY_CODE: dict[str, int] = {
+    "JPY": 6,
+}
 
 
 def format_amount(value: int) -> str:
@@ -31,19 +37,27 @@ def fmt_money(value: float) -> str:
     return s
 
 
-def format_rates_message(rates: dict[str, float]) -> str:
-    """Строит сообщение с курсами валют в формате другого бота.
+def _build_rates_header(date_str: str) -> str:
+    """Строит заголовок курсов валют.
 
-    Заголовок: "Курсы валют на DD/MM/YYYY: (ЦБ РФ)"
-    Строки: "<флаг> CODE => VALUE"; для JPY — 6 знаков после запятой, иначе 4.
-    Для всех валют используем флаг.
+    Формат: "<b>Курсы валют на <u>DD/MM/YYYY</u> (<i>ЦБ РФ</i>):</b>"
     """
-    order = ("EUR", "USD", "CNY", "KRW", "JPY")
+    return f"<b>Курсы валют на <u>{date_str}</u> (<i>ЦБ РФ</i>):</b>"
+
+
+def format_rates_message(rates: dict[str, float]) -> str:
+    """Строит сообщение с курсами валют.
+
+    Правила форматирования:
+    - Заголовок: дата подчёркнута, весь заголовок жирный, пометка (ЦБ РФ) — курсивом.
+    - Строки: "<флаг> CODE => <b>VALUE</b>".
+    - Точность: JPY — 6 знаков, для остальных — 4.
+    - Никаких суффиксов RUB в конце.
+    """
     today = datetime.now().strftime("%d/%m/%Y")
-    # Первая строка — жирным целиком, дата подчёркнута, (ЦБ РФ) — курсивом
-    header = f"<b>Курсы валют на <u>{today}</u> (<i>ЦБ РФ</i>):</b>"
+    header = _build_rates_header(today)
     lines: list[str] = [header, ""]  # пустая строка после заголовка
-    for code in order:
+    for code in RATES_ORDER:
         try:
             v = float(rates.get(code, 0.0))
         except Exception:
@@ -51,7 +65,7 @@ def format_rates_message(rates: dict[str, float]) -> str:
         if not v:
             continue
         flag = get_currency_flag(code)
-        precision = 6 if code == "JPY" else 4
+        precision = PRECISION_BY_CODE.get(code, 4)
         lines.append(f"{flag} {code} => <b>{v:.{precision}f}</b>")
     return "\n".join(lines)
 
