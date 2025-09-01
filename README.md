@@ -326,7 +326,7 @@ docker compose run --rm celery celery -A tasks.app call tasks.daily.send_daily_r
 или локально с Makefile:
 
 ```bash
-make task.daily.send
+make task.rates
 ```
 
 Примечания:
