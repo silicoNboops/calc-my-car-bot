@@ -29,7 +29,7 @@ run.celery.beat.local:
 
 # Manual trigger for daily rates task (docker env)
 task.rates:
-	docker compose run --rm celery celery -A tasks.app call tasks.daily.send_daily_rates
+	docker compose --env-file .env run --rm celery celery -A tasks.app call tasks.daily.send_daily_rates
 
 makemigrations:
 	python manage.py makemigrations
@@ -64,12 +64,9 @@ seed.rates.prod:
 
 # Quick check of seeded rows
 check.rates:
-	python manage.py shell -c "from api.calculator.models import DutyRate, UtilFee, AcciseRate, CustomsFee, Settings; \
-	print('DutyRate', DutyRate.objects.count()); \
-	print('UtilFee', UtilFee.objects.count()); \
-	print('AcciseRate', AcciseRate.objects.count()); \
-	print('CustomsFee', CustomsFee.objects.count()); \
-	print('Settings', Settings.objects.count())"
+	docker compose --env-file .env run --rm \
+		-e ENVIRONMENT=production \
+		api python manage.py shell -c 'from api.calculator.models import DutyRate, UtilFee, AcciseRate, CustomsFee, Settings; print("DutyRate", DutyRate.objects.count()); print("UtilFee", UtilFee.objects.count()); print("AcciseRate", AcciseRate.objects.count()); print("CustomsFee", CustomsFee.objects.count()); print("Settings", Settings.objects.count())'
 
 # Tests, linters & formatters
 fmt:
@@ -124,11 +121,7 @@ test-pg-cov:
 # Host wrapper: run Postgres tests inside Docker Compose network, loading creds from .env
 # Usage (from host): `make test-pg-docker`
 test-pg-docker:
-	bash -lc 'set -a; source .env; \
-		ENVIRONMENT=local docker compose run --rm \
+	docker compose --env-file .env run --rm \
+		-e ENVIRONMENT=local \
 		-e USE_FIXED_CURRENCY_PROVIDER=1 \
-		-e POSTGRES_USER \
-		-e POSTGRES_PASSWORD \
-		-e POSTGRES_DB \
-		api make test-pg'
-
+		api make test-pg
