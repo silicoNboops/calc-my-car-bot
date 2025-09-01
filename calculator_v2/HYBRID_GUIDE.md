@@ -52,19 +52,19 @@ else:
 
 ```bash
 # Последовательный гибрид, ЭД ≥ ДВС (считается как электромобиль)
-python customs_calculator_v5.py --type car --importer phys_personal \
+python customs_calculator_v6.py --type car --importer phys_personal \
   --cost 25000 --currency EUR --age 2 --volume 2000 --power 200 \
   --engine dvs --fuel gasoline_electric --series-hybrid \
   --dvs-power 120 --electric-power 100
 
 # Последовательный гибрид, ДВС > ЭД (считается как ДВС)
-python customs_calculator_v5.py --type car --importer phys_personal \
+python customs_calculator_v6.py --type car --importer phys_personal \
   --cost 25000 --currency EUR --age 2 --volume 2000 --power 200 \
   --engine dvs --fuel gasoline_electric --series-hybrid --dvs-greater-electric \
   --dvs-power 120 --electric-power 100
 
 # Параллельный гибрид (считается как ДВС)
-python customs_calculator_v5.py --type car --importer phys_personal \
+python customs_calculator_v6.py --type car --importer phys_personal \
   --cost 25000 --currency EUR --age 2 --volume 2000 --power 200 \
   --engine dvs --fuel diesel_electric --dvs-power 120 --electric-power 100
 ```
@@ -72,7 +72,7 @@ python customs_calculator_v5.py --type car --importer phys_personal \
 ### Интерактивный режим
 
 ```bash
-python customs_calculator_v5.py --interactive
+python customs_calculator_v6.py --interactive
 ```
 
 В интерактивном режиме:

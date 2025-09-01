@@ -7,7 +7,7 @@
 import sys
 sys.path.append('.')
 
-from customs_calculator_v5 import (
+from customs_calculator_v6 import (
     VehicleSpec, VehicleType, ImporterType, EngineType, FuelType,
     calculate_customs_payments
 )

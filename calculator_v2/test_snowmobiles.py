@@ -12,7 +12,7 @@ import os
 # Add the project root to Python path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from customs_calculator_v5 import (
+from customs_calculator_v6 import (
     VehicleSpec, VehicleType, ImporterType, EngineType, FuelType,
     calculate_customs_payments, RatesFetcher
 )
