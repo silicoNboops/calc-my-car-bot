@@ -105,5 +105,10 @@ test-pg-cov:
 	TEST_DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB} \
 	python -m pytest
 
+# Host wrapper: run Postgres tests inside Docker Compose network, loading creds from .env
+# Usage (from host): `make test-pg-docker`
+test-pg-docker:
+	ENVIRONMENT=local docker compose --env-file .env run --rm -e USE_FIXED_CURRENCY_PROVIDER=1 api make test-pg
+
 mypy:
 	python -m mypy .
