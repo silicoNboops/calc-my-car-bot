@@ -420,19 +420,9 @@ class CustomsCalculator:
         # Пошлина: зависит от vehicle_type
         if veh == VehicleTypeChoices.CAR:
             if not data.is_jur:
-                # ФЛ: для EV — v4 15% всегда; гибриды — как было ранее для ФЛ
+                # ФЛ: для EV — 15% всегда; гибриды считаются как ДВС по ETS (через общую таблицу)
                 if eng == EngineTypeChoices.ELECTRO:
                     duty_eur = price_eur * 0.15
-                elif eng in (EngineTypeChoices.HYBRID_SERIES, EngineTypeChoices.HYBRID_PARALLEL):
-                    if age == AgeKeyChoices.UNDER_3:
-                        rate = 0.15
-                        min_eur_cc = 0.0
-                        duty_from_price = price_eur * rate
-                        duty_from_volume = int(data.engine_cc) * min_eur_cc
-                        duty_eur = max(duty_from_price, duty_from_volume)
-                    else:
-                        rate_eur_cc = 1.0
-                        duty_eur = int(data.engine_cc) * rate_eur_cc
                 else:
                     duty_eur = self._calc_duty(price_eur, int(data.engine_cc), age, data.is_jur, eng)
             else:
