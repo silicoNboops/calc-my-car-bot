@@ -19,15 +19,16 @@
 - ФТС России
 """
 
-import sys
 import argparse
 import logging
+import sys
+
 try:
     import requests  # Optional; tests can run without it
 except ImportError:  # pragma: no cover
     requests = None
 import datetime
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any
 from dataclasses import dataclass
 from enum import Enum
 
@@ -35,22 +36,26 @@ from enum import Enum
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+
 class VehicleType(Enum):
     CAR = "car"
-    QUAD = "quad" 
+    QUAD = "quad"
     SNOWMOBILE = "snowmobile"
     MOTORCYCLE = "motorcycle"
+
 
 class ImporterType(Enum):
     PHYS_PERSONAL = "phys_personal"
     PHYS_RESALE = "phys_resale"
     JURIDICAL = "juridical"
 
+
 class EngineType(Enum):
     DVS = "dvs"  # ДВС (бензин/дизель)
     ELECTRIC = "electric"  # электро
     HYBRID_SERIES = "hybrid_series"  # последовательный гибрид
     HYBRID_PARALLEL = "hybrid_parallel"  # параллельный гибрид
+
 
 class FuelType(Enum):
     GASOLINE = "gasoline"
@@ -59,6 +64,7 @@ class FuelType(Enum):
     HYBRID = "hybrid"
     DIESEL_ELECTRIC = "diesel_electric"  # дизельный и электрический
     GASOLINE_ELECTRIC = "gasoline_electric"  # бензиновый и электрический
+
 
 @dataclass
 class VehicleSpec:
@@ -79,6 +85,7 @@ class VehicleSpec:
     is_series_hybrid: bool = False  # Силовая установка последовательного типа
     dvs_power_greater_than_electric: bool = False  # Мощность ДВС больше максимальной 30-минутной мощности ЭД
 
+
 @dataclass
 class CalculationResult:
     cost_rub: float
@@ -90,13 +97,14 @@ class CalculationResult:
     total_rub: float
     breakdown: Dict[str, Any]
 
+
 # Курсы валют - интеграция с API ЦБ РФ
 
 class RatesFetcher:
     """Класс для получения актуальных курсов валют с API ЦБ РФ"""
     CURRENCY_API_URL = "https://www.cbr-xml-daily.ru/daily_json.js"
     SUPPORTED = ["EUR", "USD", "CNY", "JPY", "KRW", "RUB"]
-    
+
     # Кэш курсов для избежания частых запросов
     _cache = {}
     _cache_time = None
@@ -106,14 +114,14 @@ class RatesFetcher:
     def get_currency_rates(cls) -> Dict[str, float]:
         """Получение актуальных курсов валют с кэшированием"""
         now = datetime.datetime.now()
-        
+
         # Проверяем кэш
-        if (cls._cache_time and 
-            (now - cls._cache_time).total_seconds() < cls._cache_duration and 
-            cls._cache):
+        if (cls._cache_time and
+                (now - cls._cache_time).total_seconds() < cls._cache_duration and
+                cls._cache):
             logger.info(f"Используются кэшированные курсы валют")
             return cls._cache
-        
+
         try:
             if requests is None:
                 raise RuntimeError("requests not available")
@@ -121,7 +129,7 @@ class RatesFetcher:
             resp = requests.get(cls.CURRENCY_API_URL, timeout=10)
             resp.raise_for_status()
             j = resp.json()
-            
+
             rates = {"RUB": 1.0}
             for code in cls.SUPPORTED:
                 if code == "RUB":
@@ -130,29 +138,31 @@ class RatesFetcher:
                     val = j["Valute"][code]["Value"]
                     nominal = j["Valute"][code]["Nominal"]
                     rates[code] = float(val) / float(nominal)
-            
+
             # Обновляем кэш
             cls._cache = rates
             cls._cache_time = now
-            
+
             logger.info(f"Курсы валют обновлены: EUR={rates.get('EUR', 0):.4f}, USD={rates.get('USD', 0):.4f}")
             return rates
-            
+
         except Exception as e:
             logger.warning(f"Не удалось получить курсы ЦБ РФ: {e}. Использую fallback.")
             # Fallback курсы
             fallback_rates = {
-                "EUR": 100.0, "USD": 90.0, "CNY": 13.5, 
+                "EUR": 100.0, "USD": 90.0, "CNY": 13.5,
                 "JPY": 0.65, "KRW": 0.07, "RUB": 1.0
             }
             cls._cache = fallback_rates
             cls._cache_time = now
             return fallback_rates
 
+
 def get_exchange_rate(currency: str) -> float:
     """Получение курса конкретной валюты к рублю"""
     rates = RatesFetcher.get_currency_rates()
     return rates.get(currency.upper(), 1.0)
+
 
 # Константы ставок 2025 года
 RATES_2025 = {
@@ -166,7 +176,7 @@ RATES_2025 = {
         {'max_hp': 500, 'rate': 1685},
         {'max_hp': float('inf'), 'rate': 1740}
     ],
-    
+
     # Утилизационный сбор - базовые ставки
     'UTIL_BASE': {
         'car': 20000,
@@ -174,7 +184,7 @@ RATES_2025 = {
         'snowmobile': 172500,
         'motorcycle': 172500  # как для квадроциклов
     },
-    
+
     # Коэффициенты утилизационного сбора
     'UTIL_COEFFS': {
         # Для физлиц личное использование
@@ -189,28 +199,28 @@ RATES_2025 = {
             'car': {
                 # Коэффициенты по объему двигателя для ДВС
                 'new_dvs_by_volume': [
-                    {'max_cc': 1000, 'coeff': 9.01},        # 180,200 / 20,000 = 9.01
-                    {'max_cc': 2000, 'coeff': 33.37},       # 667,400 / 20,000 = 33.37
-                    {'max_cc': 3000, 'coeff': 93.77},       # 1,875,400 / 20,000 = 93.77
-                    {'max_cc': 3500, 'coeff': 107.67},      # 2,153,400 / 20,000 = 107.67
+                    {'max_cc': 1000, 'coeff': 9.01},  # 180,200 / 20,000 = 9.01
+                    {'max_cc': 2000, 'coeff': 33.37},  # 667,400 / 20,000 = 33.37
+                    {'max_cc': 3000, 'coeff': 93.77},  # 1,875,400 / 20,000 = 93.77
+                    {'max_cc': 3500, 'coeff': 107.67},  # 2,153,400 / 20,000 = 107.67
                     {'max_cc': float('inf'), 'coeff': 137.11}  # 2,742,200 / 20,000 = 137.11
                 ],
                 'old_dvs_by_volume': [
-                    {'max_cc': 1000, 'coeff': 23.0},        # 460,000 / 20,000 = 23.0
-                    {'max_cc': 2000, 'coeff': 58.7},        # 1,174,000 / 20,000 = 58.7
-                    {'max_cc': 3000, 'coeff': 141.97},      # 2,839,400 / 20,000 = 141.97
-                    {'max_cc': 3500, 'coeff': 164.84},      # 3,296,800 / 20,000 = 164.84
+                    {'max_cc': 1000, 'coeff': 23.0},  # 460,000 / 20,000 = 23.0
+                    {'max_cc': 2000, 'coeff': 58.7},  # 1,174,000 / 20,000 = 58.7
+                    {'max_cc': 3000, 'coeff': 141.97},  # 2,839,400 / 20,000 = 141.97
+                    {'max_cc': 3500, 'coeff': 164.84},  # 3,296,800 / 20,000 = 164.84
                     {'max_cc': float('inf'), 'coeff': 180.24}  # 3,604,800 / 20,000 = 180.24
                 ],
                 'new_electric': 33.37, 'old_electric': 58.7,  # 667,400 / 20,000 = 33.37, 1,174,000 / 20,000 = 58.7
-                'new_hybrid': 33.37, 'old_hybrid': 58.7    # Как для электромобилей
+                'new_hybrid': 33.37, 'old_hybrid': 58.7  # Как для электромобилей
             },
             'quad': {'new': 1.63, 'old': 6.1},
             'snowmobile': {'new': 1.63, 'old': 6.1},
             'motorcycle': {'new': 1.63, 'old': 6.1}
         }
     },
-    
+
     # Пошлины для автомобилей по правилам rules_poshlina.txt
     'CAR_DUTY': {
         'personal_ets': {
@@ -314,7 +324,7 @@ RATES_2025 = {
             'old': []
         }
     },
-    
+
     # Пошлины для мотоциклов по rules_poshlina.txt
     'MOTORCYCLE_DUTY': {
         'phys_under_3': [
@@ -337,7 +347,7 @@ RATES_2025 = {
             {'max_cc': float('inf'), 'rate': 0.10, 'min_eur_cc': 0.25}
         ]
     },
-    
+
     # Пошлины для квадроциклов (ATV) по rules_poshlina.txt
     'QUAD_DUTY': {
         'phys_under_3': {
@@ -353,7 +363,7 @@ RATES_2025 = {
             'min_eur_hp': 0.5
         }
     },
-    
+
     # Пошлины для снегоходов по rules_poshlina.txt
     'SNOWMOBILE_DUTY': {
         'phys_under_3': {
@@ -369,10 +379,10 @@ RATES_2025 = {
             'min_eur_hp': 1.0
         }
     },
-    
+
     # НДС
     'VAT_RATE': 0.20,
-    
+
     # Таможенные сборы (руб) — официальные ставки с 01.01.2025 (ПП РФ № 1637)
     'CUSTOMS_FEES': [
         {'max_value_rub': 200000, 'fee': 1067},
@@ -386,6 +396,7 @@ RATES_2025 = {
     ]
 }
 
+
 def find_rate_by_value(value: float, rates_table: list, key: str) -> dict:
     """Поиск ставки по значению в таблице"""
     for rate in rates_table:
@@ -393,54 +404,56 @@ def find_rate_by_value(value: float, rates_table: list, key: str) -> dict:
             return rate
     return rates_table[-1]
 
+
 def calc_excise_progressive(power_hp: int) -> float:
     """Прогрессивный расчет акциза по диапазонам мощности (НК РФ ст. 193)"""
     if power_hp <= 90:
         return 0.0
-    
+
     excise = 0.0
-    
+
     # Диапазон 91-150 л.с.: 61 руб/л.с.
     if power_hp > 90:
         power_in_range = min(power_hp, 150) - 90
         excise += power_in_range * 61
         if power_hp <= 150:
             return excise
-    
+
     # Диапазон 151-200 л.с.: 583 руб/л.с.
     if power_hp > 150:
         power_in_range = min(power_hp, 200) - 150
         excise += power_in_range * 583
         if power_hp <= 200:
             return excise
-    
+
     # Диапазон 201-300 л.с.: 955 руб/л.с.
     if power_hp > 200:
         power_in_range = min(power_hp, 300) - 200
         excise += power_in_range * 955
         if power_hp <= 300:
             return excise
-    
+
     # Диапазон 301-400 л.с.: 1628 руб/л.с.
     if power_hp > 300:
         power_in_range = min(power_hp, 400) - 300
         excise += power_in_range * 1628
         if power_hp <= 400:
             return excise
-    
+
     # Диапазон 401-500 л.с.: 1685 руб/л.с.
     if power_hp > 400:
         power_in_range = min(power_hp, 500) - 400
         excise += power_in_range * 1685
         if power_hp <= 500:
             return excise
-    
+
     # Диапазон свыше 500 л.с.: 1740 руб/л.с.
     if power_hp > 500:
         power_in_range = power_hp - 500
         excise += power_in_range * 1740
-    
+
     return excise
+
 
 def calc_excise_electric(power_hp: int) -> float:
     """Расчет акциза для электромобилей по диапазонам мощности согласно electro_car_rules.txt
@@ -482,6 +495,7 @@ def calc_excise_flat(power_hp: int) -> float:
     last = RATES_2025['EXCISE_RATES'][-1]
     return float(power_hp) * float(last['rate'])
 
+
 def calc_excise(spec: VehicleSpec) -> float:
     """Расчет акциза с учетом типа двигателя и ставок
     
@@ -501,17 +515,17 @@ def calc_excise(spec: VehicleSpec) -> float:
             return spec.power_hp * 583.0
         else:
             return 0.0
-    
+
     # Для квадроциклов/снегоходов акциз не применяется
     if spec.vehicle_type not in [VehicleType.CAR, VehicleType.MOTORCYCLE]:
         return 0.0
-    
+
     # Обработка электромобилей
     if spec.engine_type == EngineType.ELECTRIC or spec.fuel_type == FuelType.ELECTRIC:
         # Электромобили облагаются акцизом даже для физлиц личное использование
         # Согласно electro_car_rules.txt
         return calc_excise_electric(spec.power_hp)
-    
+
     # Обработка новых гибридных типов
     if spec.fuel_type in [FuelType.DIESEL_ELECTRIC, FuelType.GASOLINE_ELECTRIC]:
         if spec.is_series_hybrid:
@@ -531,42 +545,44 @@ def calc_excise(spec: VehicleSpec) -> float:
             if spec.importer_type in (ImporterType.PHYS_PERSONAL, ImporterType.PHYS_RESALE):
                 return 0.0
             return calc_excise_flat(spec.power_hp)
-    
+
     # Физические лица (личное использование и перепродажа) освобождены от акциза на обычные автомобили (не электро)
-    if spec.vehicle_type == VehicleType.CAR and spec.importer_type in (ImporterType.PHYS_PERSONAL, ImporterType.PHYS_RESALE):
+    if spec.vehicle_type == VehicleType.CAR and spec.importer_type in (ImporterType.PHYS_PERSONAL,
+                                                                       ImporterType.PHYS_RESALE):
         return 0.0
-    
+
     if spec.engine_type == EngineType.HYBRID_SERIES:
         # Последовательный гибрид — используем общую мощность
         return calc_excise_flat(spec.power_hp)
-    
+
     elif spec.engine_type == EngineType.HYBRID_PARALLEL:
         # Параллельный гибрид — используем общую мощность
         return calc_excise_flat(spec.power_hp)
-    
+
     else:
         # Для ДВС — расчет по диапазонам мощности (НК РФ ст. 193)
         return calc_excise_flat(spec.power_hp)
 
-def calc_util_fee(vehicle_type: VehicleType, importer_type: ImporterType, 
-                  age_years: int, engine_type: EngineType, engine_volume_cc: int, 
+
+def calc_util_fee(vehicle_type: VehicleType, importer_type: ImporterType,
+                  age_years: int, engine_type: EngineType, engine_volume_cc: int,
                   spec: VehicleSpec = None) -> float:
     """Расчет утилизационного сбора"""
     # Для мотоциклов утилизационный сбор не платится
     if vehicle_type == VehicleType.MOTORCYCLE:
         return 0.0
-    
+
     vehicle_key = vehicle_type.value
     is_new = age_years <= 3
     age_key = 'new' if is_new else 'old'
-    
+
     base_rate = RATES_2025['UTIL_BASE'][vehicle_key]
-    
+
     # Специальная логика для квадроциклов согласно quad_rules.txt
     if vehicle_key == 'quad':
         # Базовая ставка: 172 500 руб.
         base_rate = 172500
-        
+
         # Для физических лиц (личное использование) применяем правила K01/K02
         if importer_type == ImporterType.PHYS_PERSONAL:
             # Для электрических квадроциклов применяем K01 (как для объема < 300 см³)
@@ -588,7 +604,7 @@ def calc_util_fee(vehicle_type: VehicleType, importer_type: ImporterType,
                     return base_rate * 0.7  # 120 750 руб.
                 else:
                     return base_rate * 1.3  # 224 250 руб.
-        
+
         # Для юридических лиц и физлиц-перепродажа:
         # Согласно официальным данным, применяется коэффициент в зависимости от объема и возраста
         else:
@@ -612,12 +628,12 @@ def calc_util_fee(vehicle_type: VehicleType, importer_type: ImporterType,
                     return base_rate * 0.7  # 120 750 руб.
                 else:
                     return base_rate * 1.3  # 224 250 руб.
-    
+
     # Специальная логика для снегоходов согласно snowmobile_rules.txt
     if vehicle_key == 'snowmobile':
         # Базовая ставка: 172 500 руб.
         base_rate = 172500
-        
+
         # Для физических лиц (личное использование) применяем правила L01/L02
         if importer_type == ImporterType.PHYS_PERSONAL:
             # Для электрических снегоходов применяем L01 (как для объема < 300 см³)
@@ -639,7 +655,7 @@ def calc_util_fee(vehicle_type: VehicleType, importer_type: ImporterType,
                     return base_rate * 0.7  # 120 750 руб.
                 else:
                     return base_rate * 1.3  # 224 250 руб.
-        
+
         # Для юридических лиц и физлиц-перепродажа:
         # Согласно официальным данным, применяется аналогичная логика
         else:
@@ -662,7 +678,7 @@ def calc_util_fee(vehicle_type: VehicleType, importer_type: ImporterType,
                     return base_rate * 0.7  # 120 750 руб.
                 else:
                     return base_rate * 1.3  # 224 250 руб.
-    
+
     if importer_type == ImporterType.PHYS_PERSONAL:
         # Для физлиц личное использование - фиксированные суммы
         if vehicle_key == 'car':
@@ -701,8 +717,9 @@ def calc_util_fee(vehicle_type: VehicleType, importer_type: ImporterType,
                 coeff = rate_info['coeff']
         else:
             coeff = RATES_2025['UTIL_COEFFS']['commercial'][vehicle_key][age_key]
-        
+
         return base_rate * coeff
+
 
 def calc_customs_fee(cost_rub: float, importer_type: ImporterType) -> float:
     """Расчет таможенного сбора по таблице ПП РФ № 1637 (единые ставки для всех импортёров).
@@ -713,6 +730,7 @@ def calc_customs_fee(cost_rub: float, importer_type: ImporterType) -> float:
     """
     rate_info = find_rate_by_value(cost_rub, RATES_2025['CUSTOMS_FEES'], 'max_value_rub')
     return rate_info['fee']
+
 
 def calc_car_duty(spec: VehicleSpec, cost_eur: float) -> float:
     """Расчет пошлины для автомобилей по rules_poshlina.txt."""
@@ -787,6 +805,7 @@ def calc_car_duty(spec: VehicleSpec, cost_eur: float) -> float:
             info = find_rate_by_value(spec.engine_volume_cc, table, 'max_cc')
             return spec.engine_volume_cc * info['eur_cc']
 
+
 def calc_quad_duty(spec: VehicleSpec, cost_eur: float) -> float:
     """Расчет пошлины для квадроциклов по quad_rules.txt
     
@@ -798,7 +817,7 @@ def calc_quad_duty(spec: VehicleSpec, cost_eur: float) -> float:
     # Для электрических квадроциклов применяем ставку 15%
     if spec.engine_type == EngineType.ELECTRIC:
         return cost_eur * 0.15
-    
+
     # Для юридических лиц с ДВС квадроциклами
     if spec.importer_type == ImporterType.JURIDICAL:
         if spec.age_years <= 3:
@@ -812,9 +831,10 @@ def calc_quad_duty(spec: VehicleSpec, cost_eur: float) -> float:
         else:
             # Очень старые квадроциклы (> 7 лет): фиксированная ставка 1.4 евро/см³
             return spec.engine_volume_cc * 1.4
-    
+
     # Для физлиц: по умолчанию 5% (можно доработать по более сложным правилам)
     return cost_eur * 0.05
+
 
 def calc_snowmobile_duty(spec: VehicleSpec, cost_eur: float) -> float:
     """Расчет пошлины для снегоходов
@@ -822,6 +842,7 @@ def calc_snowmobile_duty(spec: VehicleSpec, cost_eur: float) -> float:
     Все снегоходы используют 5% пошлину независимо от возраста
     """
     return cost_eur * 0.05
+
 
 def calc_motorcycle_duty(spec: VehicleSpec, cost_eur: float) -> float:
     """Расчет пошлины для мотоциклов по moto_akciz.txt
@@ -832,10 +853,10 @@ def calc_motorcycle_duty(spec: VehicleSpec, cost_eur: float) -> float:
     # Электрические мотоциклы
     if spec.engine_type == EngineType.ELECTRIC:
         return cost_eur * 0.15
-    
+
     # ДВС мотоциклы по объему двигателя
     volume_cc = spec.engine_volume_cc
-    
+
     if volume_cc <= 50:
         return cost_eur * 0.14
     elif volume_cc <= 125:
@@ -851,17 +872,18 @@ def calc_motorcycle_duty(spec: VehicleSpec, cost_eur: float) -> float:
     else:  # > 800 см³
         return cost_eur * 0.10
 
+
 def calculate_customs_payments(spec: VehicleSpec) -> CalculationResult:
     """Основная функция расчета таможенных платежей"""
-    
+
     # Конвертация в рубли
     exchange_rate = get_exchange_rate(spec.currency)
     cost_rub = spec.cost_original * exchange_rate
-    
+
     # Конвертация в евро для расчета пошлин
     eur_rate = get_exchange_rate('EUR')
     cost_eur = cost_rub / eur_rate
-    
+
     # Расчет пошлины в зависимости от типа ТС
     if spec.vehicle_type == VehicleType.CAR:
         duty_eur = calc_car_duty(spec, cost_eur)
@@ -871,36 +893,36 @@ def calculate_customs_payments(spec: VehicleSpec) -> CalculationResult:
         duty_eur = calc_motorcycle_duty(spec, cost_eur)
     else:  # SNOWMOBILE
         duty_eur = calc_snowmobile_duty(spec, cost_eur)
-    
+
     duty_rub = duty_eur * eur_rate
-    
+
     # Акциз (для легковых автомобилей и мотоциклов - НК РФ ст. 193)
     excise_rub = 0.0
     if spec.vehicle_type in [VehicleType.CAR, VehicleType.MOTORCYCLE]:
         excise_rub = calc_excise(spec)
-    
+
     # НДС (для юридических лиц и электромобилей для всех)
     vat_rub = 0.0
-    is_electric_for_vat = (spec.engine_type == EngineType.ELECTRIC or 
-                          spec.fuel_type == FuelType.ELECTRIC or
-                          (spec.fuel_type in [FuelType.DIESEL_ELECTRIC, FuelType.GASOLINE_ELECTRIC] and 
-                           spec.is_series_hybrid and not spec.dvs_power_greater_than_electric))
-    
-    if (spec.importer_type == ImporterType.JURIDICAL or 
-        (is_electric_for_vat and spec.vehicle_type == VehicleType.CAR)):
+    is_electric_for_vat = (spec.engine_type == EngineType.ELECTRIC or
+                           spec.fuel_type == FuelType.ELECTRIC or
+                           (spec.fuel_type in [FuelType.DIESEL_ELECTRIC, FuelType.GASOLINE_ELECTRIC] and
+                            spec.is_series_hybrid and not spec.dvs_power_greater_than_electric))
+
+    if (spec.importer_type == ImporterType.JURIDICAL or
+            (is_electric_for_vat and spec.vehicle_type == VehicleType.CAR)):
         vat_base = cost_rub + duty_rub + excise_rub
         vat_rub = vat_base * RATES_2025['VAT_RATE']
-    
+
     # Утилизационный сбор
-    util_fee_rub = calc_util_fee(spec.vehicle_type, spec.importer_type, 
-                                spec.age_years, spec.engine_type, spec.engine_volume_cc, spec)
-    
+    util_fee_rub = calc_util_fee(spec.vehicle_type, spec.importer_type,
+                                 spec.age_years, spec.engine_type, spec.engine_volume_cc, spec)
+
     # Таможенный сбор
     customs_fee_rub = calc_customs_fee(cost_rub, spec.importer_type)
-    
+
     # Итого
     total_rub = duty_rub + excise_rub + vat_rub + util_fee_rub + customs_fee_rub
-    
+
     # Детализация для отчета
     breakdown = {
         'cost_original': spec.cost_original,
@@ -922,7 +944,7 @@ def calculate_customs_payments(spec: VehicleSpec) -> CalculationResult:
         }[spec.importer_type],
         'engine_type_ru': get_engine_type_description(spec)
     }
-    
+
     return CalculationResult(
         cost_rub=cost_rub,
         duty_rub=duty_rub,
@@ -933,6 +955,7 @@ def calculate_customs_payments(spec: VehicleSpec) -> CalculationResult:
         total_rub=total_rub,
         breakdown=breakdown
     )
+
 
 def get_engine_type_description(spec: VehicleSpec) -> str:
     """Получение описания типа двигателя"""
@@ -962,14 +985,16 @@ def get_engine_type_description(spec: VehicleSpec) -> str:
         # Для обычных ДВС возвращаем общее "ДВС" для совместимости с тестами
         return 'ДВС'
 
+
 def format_currency(amount: float) -> str:
     """Форматирование суммы в рублях"""
     return f"{amount:,.0f}".replace(",", " ")
 
+
 def print_calculation_result(result: CalculationResult):
     """Вывод результатов расчета"""
     bd = result.breakdown
-    
+
     print("\n" + "=" * 60)
     print("           РАСЧЕТ ТАМОЖЕННЫХ ПЛАТЕЖЕЙ")
     print("=" * 60)
@@ -977,7 +1002,7 @@ def print_calculation_result(result: CalculationResult):
     print(f"Импортер: {bd['importer_type_ru']}")
     print(f"Тип двигателя: {bd['engine_type_ru']}")
     print(f"Стоимость: {bd['cost_original']:,.2f} {bd['currency']} = {format_currency(result.cost_rub)} руб.")
-    
+
     # Информация о курсах валют
     rates_info = "📈 Курсы ЦБ РФ: "
     if bd['currency'] != 'RUB':
@@ -985,28 +1010,29 @@ def print_calculation_result(result: CalculationResult):
     if bd['currency'] != 'EUR':
         rates_info += f", EUR/RUB = {bd['eur_rate']:.4f}"
     print(rates_info)
-    
+
     print("\nТАМОЖЕННЫЕ ПЛАТЕЖИ:")
     print(f"• Пошлина: {format_currency(result.duty_rub)} руб. ({bd['duty_eur']:.2f} EUR)")
-    
+
     if result.excise_rub > 0:
         print(f"• Акциз: {format_currency(result.excise_rub)} руб.")
-    
+
     if result.vat_rub > 0:
         print(f"• НДС (20%): {format_currency(result.vat_rub)} руб.")
-    
+
     print(f"• Утилизационный сбор: {format_currency(result.util_fee_rub)} руб.")
     print(f"• Таможенный сбор: {format_currency(result.customs_fee_rub)} руб.")
-    
+
     print(f"\nИТОГО К ДОПЛАТЕ: {format_currency(result.total_rub)} руб.")
-    
+
     # Предупреждения
     if result.breakdown['importer_type_ru'] == 'Физлицо (перепродажа)':
         print("\n⚠️  ВНИМАНИЕ: Для перепродажи необходимо оформление ИП или ООО!")
-    
+
     print("\n📋 Примечание: Расчет выполнен по ставкам 2025 года.")
     print("   Для точного расчета обратитесь к таможенному брокеру.")
     print("=" * 60)
+
 
 def update_exchange_rates():
     """Принудительное обновление курсов валют"""
@@ -1014,14 +1040,15 @@ def update_exchange_rates():
     # Очищаем кэш для принудительного обновления
     RatesFetcher._cache = {}
     RatesFetcher._cache_time = None
-    
+
     rates = RatesFetcher.get_currency_rates()
-    
+
     print("💱 Актуальные курсы ЦБ РФ:")
     for currency, rate in rates.items():
         if currency != 'RUB':
             print(f"   {currency}/RUB: {rate:.4f}")
     print()
+
 
 def _prompt_choice(title: str, choices: list[str], default_index: int = 0) -> str:
     """Универсальный выбор из списка (возвращает значение из списка)."""
@@ -1039,6 +1066,7 @@ def _prompt_choice(title: str, choices: list[str], default_index: int = 0) -> st
                 return choices[idx - 1]
         print("Некорректный ввод, попробуйте снова.")
 
+
 def _prompt_number(title: str, cast=float, default: float | None = None) -> float:
     """Запрос числа с приводом типа."""
     while True:
@@ -1053,6 +1081,7 @@ def _prompt_number(title: str, cast=float, default: float | None = None) -> floa
         except Exception:
             print("Некорректный ввод, попробуйте снова.")
 
+
 def _prompt_yes_no(title: str, default: bool = False) -> bool:
     """Запрос ответа да/нет."""
     d = 'Y/n' if default else 'y/N'
@@ -1065,6 +1094,7 @@ def _prompt_yes_no(title: str, default: bool = False) -> bool:
         if raw in ('n', 'no', 'н', 'нет'):
             return False
         print("Введите 'y' или 'n'.")
+
 
 def start_interactive() -> VehicleSpec:
     """Интерактивный опрос параметров и сбор VehicleSpec."""
@@ -1091,16 +1121,16 @@ def start_interactive() -> VehicleSpec:
     age = int(_prompt_number("Возраст ТС (лет)", int))
 
     # Базовый выбор топлива/природы двигателя
-    base_fuel = _prompt_choice("Тип двигателя (по топливу)", 
-                              ['gasoline', 'diesel', 'electric', 'diesel_electric', 'gasoline_electric'], 
-                              default_index=0)
+    base_fuel = _prompt_choice("Тип двигателя (по топливу)",
+                               ['gasoline', 'diesel', 'electric', 'diesel_electric', 'gasoline_electric'],
+                               default_index=0)
 
     # Определяем архитектуру двигателя и топливо
     engine_type = EngineType.DVS
     fuel_type = FuelType.GASOLINE
     is_series_hybrid = False
     dvs_power_greater_than_electric = False
-    
+
     if base_fuel == 'electric':
         engine_type = EngineType.ELECTRIC
         fuel_type = FuelType.ELECTRIC
@@ -1108,10 +1138,10 @@ def start_interactive() -> VehicleSpec:
         # Новые гибридные типы - сразу спрашиваем параметры гибрида
         fuel_type = FuelType.DIESEL_ELECTRIC if base_fuel == 'diesel_electric' else FuelType.GASOLINE_ELECTRIC
         engine_type = EngineType.DVS  # Базовый тип для расчетов
-        
+
         # Спрашиваем про последовательную установку
         is_series_hybrid = _prompt_yes_no("Силовая установка последовательного типа?", default=False)
-        
+
         # Спрашиваем про соотношение мощностей (актуально для всех гибридов)
         dvs_power_greater_than_electric = _prompt_yes_no(
             "Мощность ДВС больше максимальной 30-минутной мощности ЭД?", default=False)
@@ -1133,7 +1163,7 @@ def start_interactive() -> VehicleSpec:
         power_float = _prompt_number("Мощность (л.с.)", float)
         # Для расчетов используем целое число, округляя вверх для дробных значений
         power = int(power_float) if power_float == int(power_float) else int(power_float) + 1
-        
+
         # Для гибридных типов используем общую мощность автомобиля
         # Детальные мощности ДВС и ЭД не запрашиваем - они не влияют на расчет
 
@@ -1158,6 +1188,7 @@ def start_interactive() -> VehicleSpec:
 
     return spec
 
+
 def main():
     """Главная функция CLI"""
     parser = argparse.ArgumentParser(
@@ -1179,45 +1210,47 @@ def main():
   python customs_calculator_v2.py --update-rates
         """
     )
-    
+
     parser.add_argument('--type', choices=['car', 'quad', 'snowmobile', 'motorcycle'],
-                       help='Тип транспортного средства')
+                        help='Тип транспортного средства')
     parser.add_argument('--importer', choices=['phys_personal', 'phys_resale', 'juridical'],
-                       help='Тип импортера')
+                        help='Тип импортера')
     parser.add_argument('--cost', type=float,
-                       help='Стоимость ТС')
+                        help='Стоимость ТС')
     parser.add_argument('--currency', choices=['RUB', 'EUR', 'USD', 'CNY', 'JPY'], default='RUB',
-                       help='Валюта стоимости (по умолчанию RUB)')
+                        help='Валюта стоимости (по умолчанию RUB)')
     parser.add_argument('--age', type=int,
-                       help='Возраст ТС в годах')
+                        help='Возраст ТС в годах')
     parser.add_argument('--volume', type=int,
-                       help='Объем двигателя в см³ (0 для электро)')
+                        help='Объем двигателя в см³ (0 для электро)')
     parser.add_argument('--power', type=int,
-                       help='Мощность в л.с.')
+                        help='Мощность в л.с.')
     parser.add_argument('--engine', choices=['dvs', 'electric', 'hybrid', 'hybrid_series', 'hybrid_parallel'],
-                       help='Тип двигателя (hybrid = hybrid_parallel для совместимости)')
-    parser.add_argument('--fuel', choices=['gasoline', 'diesel', 'electric', 'hybrid', 'diesel_electric', 'gasoline_electric'], default='gasoline',
-                       help='Тип топлива для ставок пошлины (primarily for juridical)')
+                        help='Тип двигателя (hybrid = hybrid_parallel для совместимости)')
+    parser.add_argument('--fuel',
+                        choices=['gasoline', 'diesel', 'electric', 'hybrid', 'diesel_electric', 'gasoline_electric'],
+                        default='gasoline',
+                        help='Тип топлива для ставок пошлины (primarily for juridical)')
     parser.add_argument('--dvs-power', type=int, default=0,
-                       help='Мощность ДВС части для гибридов (л.с.)')
+                        help='Мощность ДВС части для гибридов (л.с.)')
     parser.add_argument('--electric-power', type=int, default=0,
-                       help='Мощность электро части для гибридов (л.с.)')
+                        help='Мощность электро части для гибридов (л.с.)')
     parser.add_argument('--series-hybrid', action='store_true',
-                       help='Силовая установка последовательного типа')
+                        help='Силовая установка последовательного типа')
     parser.add_argument('--dvs-greater-electric', action='store_true',
-                       help='Мощность ДВС больше максимальной 30-минутной мощности ЭД')
+                        help='Мощность ДВС больше максимальной 30-минутной мощности ЭД')
     parser.add_argument('--update-rates', action='store_true',
-                       help='Обновить курсы валют и выйти')
+                        help='Обновить курсы валют и выйти')
     parser.add_argument('--interactive', action='store_true',
-                       help='Интерактивный режим (вопросы-ответы)')
-    
+                        help='Интерактивный режим (вопросы-ответы)')
+
     args = parser.parse_args()
-    
+
     # Обработка обновления курсов
     if args.update_rates:
         update_exchange_rates()
         return
-    
+
     # Интерактивный режим
     if args.interactive:
         try:
@@ -1237,14 +1270,14 @@ def main():
     if missing_args:
         parser.error(f"Для расчета требуются аргументы: {', '.join('--' + arg for arg in missing_args)}")
         return
-    
+
     try:
         # Создание спецификации ТС
         engine_type = args.engine
         # Обратная совместимость: hybrid -> hybrid_parallel
         if engine_type == 'hybrid':
             engine_type = 'hybrid_parallel'
-        
+
         spec = VehicleSpec(
             vehicle_type=VehicleType(args.type),
             importer_type=ImporterType(args.importer),
@@ -1260,21 +1293,22 @@ def main():
             is_series_hybrid=args.series_hybrid,
             dvs_power_greater_than_electric=args.dvs_greater_electric
         )
-        
+
         # Валидация
         if spec.engine_type == EngineType.ELECTRIC and spec.engine_volume_cc != 0:
             logger.warning("Для электро ТС объем двигателя должен быть 0")
             spec.engine_volume_cc = 0
-        
+
         # Расчет
         result = calculate_customs_payments(spec)
-        
+
         # Вывод результата
         print_calculation_result(result)
-        
+
     except Exception as e:
         logger.error(f"Ошибка расчета: {e}")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()
