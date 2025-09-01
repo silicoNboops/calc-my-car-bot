@@ -49,6 +49,8 @@ from bot.utils.strings import (
     PROMPT_CHOOSE_AGE,
     CONTACT_LINE,
 )
+from calculator_v2.adapter import run_v6_with_bot_payload
+from calculator_v2.customs_calculator_v6 import RatesFetcher, CalculationResult
 
 if TYPE_CHECKING:
     from aiogram.types import CallbackQuery, Message
@@ -68,6 +70,24 @@ def _format_calc_result(res) -> str:  # type: ignore[no-untyped-def]
         f"НДС (RUB): <b>{fmt_money(res.vat_rub)}</b>\n"
         f"Таможенный сбор (RUB): <b>{fmt_money(res.customs_fee)}</b>\n"
         f"Всего (RUB): <b>{fmt_money(res.subtotal_customs)}</b>\n"
+    )
+
+
+def _format_calc_result_v6(res: CalculationResult) -> str:
+    """Форматирование результата v6 под текущий UI."""
+    duty_eur = float(res.breakdown.get("duty_eur", 0.0) or 0.0)
+    price_eur = float(res.breakdown.get("cost_eur", 0.0) or 0.0)
+    return (
+        "🧮 Итог расчёта:\n"
+        f"Цена (RUB): <b>{fmt_money(res.cost_rub)}</b>\n"
+        f"Цена (EUR): <b>{fmt_money(price_eur)}</b>\n"
+        f"Пошлина (EUR): <b>{fmt_money(duty_eur)}</b>\n"
+        f"Пошлина (RUB): <b>{fmt_money(res.duty_rub)}</b>\n"
+        f"Утильсбор (RUB): <b>{fmt_money(res.util_fee_rub)}</b>\n"
+        f"Акциз (RUB): <b>{fmt_money(res.excise_rub)}</b>\n"
+        f"НДС (RUB): <b>{fmt_money(res.vat_rub)}</b>\n"
+        f"Таможенный сбор (RUB): <b>{fmt_money(res.customs_fee_rub)}</b>\n"
+        f"Всего (RUB): <b>{fmt_money(res.total_rub)}</b>\n"
     )
 
 
@@ -92,6 +112,13 @@ def _estimate_sync(payload: dict) -> tuple[str, dict[str, float], float]:
         pass
     res = calc.estimate(EstimateInput(**data))
     return _format_calc_result(res), provider.get_rates(), float(res.subtotal_customs)
+
+
+def _estimate_v6_sync(payload: dict) -> tuple[str, dict[str, float], float]:
+    """Синхронный расчёт через v6-адаптер без Django/ORM."""
+    res_v6 = run_v6_with_bot_payload(payload)
+    rates = RatesFetcher.get_currency_rates()
+    return _format_calc_result_v6(res_v6), rates, float(res_v6.total_rub)
 
 
 def _get_company_commission_rub() -> float:
@@ -336,7 +363,8 @@ _calc_accise(self, hp, is_commercial, engine_type, ...)
         "vehicle_type": str(data.get("vehicle_type", "car")),
     }
     try:
-        result_text, rates, subtotal_customs = await sync_to_async(_estimate_sync)(payload)
+        # Используем новый калькулятор v6 напрямую
+        result_text, rates, subtotal_customs = await sync_to_async(_estimate_v6_sync)(payload)
     except Exception as e:  # noqa: BLE001
         await call.message.edit_text(f"Ошибка расчёта: {e}")
         await call.answer()
