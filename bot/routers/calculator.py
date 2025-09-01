@@ -10,18 +10,17 @@ from asgiref.sync import sync_to_async
 from api.calculator.choices import Currency as CurrencyChoices, EngineType as EngineTypeChoices, \
     VehicleType as VehicleTypeChoices, AgeKey as AgeKeyChoices
 from api.calculator.choices import ImporterKind
+from api.calculator.models import Settings
 from api.calculator.services import (
     CalculatorService,
     EstimateInput,
     get_default_currency_provider,
 )
-from api.calculator.models import Settings
 from bot.keyboards.calculator import (
     VehicleTypeCD,
     CurrencyCD,
     currency_kb,
     format_vehicle_title,
-    format_currency_title,
     RoleCD,
     role_kb,
     format_importer_kind_title,
@@ -33,6 +32,7 @@ from bot.keyboards.calculator import (
     format_age_key_title,
 )
 from bot.states import CalculatorState
+from bot.utils.currency import format_currency_title
 from bot.utils.formatting import (
     format_amount,
     fmt_money,
