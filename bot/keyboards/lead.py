@@ -5,11 +5,12 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 
 def lead_after_calc_kb() -> InlineKeyboardMarkup:
-    """Клавиатура с кнопкой 'Оставить заявку' после расчета."""
+    """Клавиатура с кнопками после расчета."""
     builder = InlineKeyboardBuilder()
     builder.button(text="📝 Оставить заявку", callback_data="lead:create_with_calc")
+    builder.button(text="🔄 Повторить расчет", callback_data="calc:restart")
     builder.button(text="🏠 В главное меню", callback_data="lead:back_to_menu")
-    builder.adjust(1)
+    builder.adjust(2, 1)  # 2 кнопки в первом ряду, 1 во втором
     return builder.as_markup()
 
 

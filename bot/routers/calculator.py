@@ -32,6 +32,7 @@ from bot.keyboards.calculator import (
     format_age_key_title,
 )
 from bot.keyboards.lead import lead_after_calc_kb
+from bot.keyboards.calculator import vehicle_type_kb
 from bot.states import CalculatorState
 from bot.utils.currency import format_currency_title
 from bot.utils.formatting import (
@@ -48,6 +49,7 @@ from bot.utils.strings import (
     PROMPT_CHOOSE_ENGINE_TYPE,
     PROMPT_ENTER_ENGINE_CC,
     PROMPT_CHOOSE_AGE,
+    PROMPT_CHOOSE_VEHICLE_TYPE,
     CONTACT_LINE,
 )
 
@@ -442,3 +444,41 @@ _calc_accise(self, hp, is_commercial, engine_type, ...)
     await _edit_or_send(call.message, final_text, reply_markup=lead_after_calc_kb())
     await call.answer()
     # НЕ сбрасываем состояние - оставляем данные для заявки
+
+
+@router.callback_query(F.data == "calc:restart")
+async def restart_calculation(call: CallbackQuery, state: FSMContext) -> None:
+    """Перезапуск расчета с сохранением предыдущих данных."""
+    await call.answer()
+    
+    # Сохраняем текущие данные расчета как предыдущие (если есть)
+    current_data = await state.get_data()
+    if current_data.get('calculation_params'):
+        await state.update_data(
+            previous_calculation_params=current_data.get('calculation_params'),
+            previous_calculation_result=current_data.get('calculation_result'),
+            previous_calculation_created_at=current_data.get('calculation_created_at')
+        )
+    
+    # Очищаем текущие данные расчета, но оставляем предыдущие
+    calculation_keys_to_clear = [
+        'vehicle_type', 'currency', 'price', 'importer_kind', 'engine_type', 
+        'engine_cc', 'age_key', 'is_jur', 'is_personal_use', 'vehicle_title',
+        'currency_title', 'prompt_chat_id', 'prompt_message_id',
+        'calculation_params', 'calculation_result', 'calculation_created_at'
+    ]
+    
+    for key in calculation_keys_to_clear:
+        current_data.pop(key, None)
+    
+    await state.set_data(current_data)
+    
+    # Запускаем новый расчет - отправляем НОВОЕ сообщение
+    from bot.utils.strings import PROMPT_CHOOSE_VEHICLE_TYPE
+    await state.set_state(CalculatorState.VEHICLE_TYPE)
+    await call.message.answer(
+        PROMPT_CHOOSE_VEHICLE_TYPE,
+        reply_markup=vehicle_type_kb()
+    )
+
+
