@@ -108,12 +108,13 @@ test-pg-cov:
 # Host wrapper: run Postgres tests inside Docker Compose network, loading creds from .env
 # Usage (from host): `make test-pg-docker`
 test-pg-docker:
-	ENVIRONMENT=local docker compose --env-file .env run --rm \
+	bash -lc 'set -a; source .env; \
+		ENVIRONMENT=local docker compose run --rm \
 		-e USE_FIXED_CURRENCY_PROVIDER=1 \
 		-e POSTGRES_USER \
 		-e POSTGRES_PASSWORD \
 		-e POSTGRES_DB \
-		api make test-pg
+		api make test-pg'
 
 mypy:
 	python -m mypy .
