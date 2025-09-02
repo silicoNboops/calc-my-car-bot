@@ -15,11 +15,12 @@ class CalculatorState(StatesGroup):
     ROLE = State()
     ENGINE_TYPE = State()
     ENGINE_CC = State()
+    ENGINE_HP = State()
     AGE_KEY = State()
 
 
 class LeadState(StatesGroup):
     """FSM для создания заявки."""
-    
+
     WAITING_NAME = State()
     WAITING_PHONE = State()
