@@ -17,6 +17,7 @@ from api.calculator.services import (
     EstimateInput,
     get_default_currency_provider,
 )
+from api.user.models import User, CalculationLog
 from bot.keyboards.calculator import (
     VehicleTypeCD,
     CurrencyCD,
