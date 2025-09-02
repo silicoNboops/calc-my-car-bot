@@ -90,8 +90,8 @@ services:
     image: rabbitmq:3-management
     restart: unless-stopped
     environment:
-        RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-guest}
-        RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-guest}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-guest}
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
     ports:
