@@ -6,7 +6,7 @@ from django.contrib import admin
 from django.utils.html import format_html
 
 from api.common.admin import export_as_csv, export_as_json
-from api.user.models import User, Lead
+from api.user.models import User, Lead, CalculationLog
 
 
 @admin.register(User)
@@ -77,7 +77,7 @@ class UserAdmin(admin.ModelAdmin):
 class LeadAdmin(admin.ModelAdmin):
     list_display = (
         "id",
-        "name", 
+        "name",
         "phone",
         "user_link",
         "has_calculation",
@@ -94,7 +94,7 @@ class LeadAdmin(admin.ModelAdmin):
     ordering = ("-created_at",)
     list_per_page = 50
     actions = [export_as_csv, export_as_json, "mark_as_processed"]
-    
+
     fieldsets = (
         ("Основная информация", {
             "fields": ("name", "phone", "user", "created_at")
@@ -107,7 +107,7 @@ class LeadAdmin(admin.ModelAdmin):
             "classes": ("collapse",)
         }),
     )
-    
+
     def user_link(self, obj):
         if obj.user:
             return format_html(
@@ -116,20 +116,22 @@ class LeadAdmin(admin.ModelAdmin):
                 obj.user.username or f"ID: {obj.user.telegram_id}"
             )
         return "-"
+
     user_link.short_description = "Пользователь"
-    
+
     def has_calculation(self, obj):
         return "✅" if obj.calculation_data else "❌"
+
     has_calculation.short_description = "Есть расчет"
     has_calculation.boolean = True
-    
+
     def calculation_display(self, obj):
         if not obj.calculation_data:
             return "Нет данных расчета"
-        
+
         data = obj.calculation_data
         html = "<div style='font-family: monospace;'>"
-        
+
         # Параметры расчета
         if 'params' in data:
             params = data['params']
@@ -140,7 +142,7 @@ class LeadAdmin(admin.ModelAdmin):
             html += f"<p>Тип двигателя: {params.get('engine_type', '-')}</p>"
             html += f"<p>Возраст: {params.get('age_key', '-')}</p>"
             html += f"<p>Импортер: {params.get('importer_kind', '-')}</p>"
-        
+
         # Результаты расчета
         if 'result' in data:
             result = data['result']
@@ -149,11 +151,12 @@ class LeadAdmin(admin.ModelAdmin):
             html += f"<p>Пошлина (RUB): {result.get('duty_rub', '-')}</p>"
             html += f"<p>НДС (RUB): {result.get('vat_rub', '-')}</p>"
             html += f"<p>Утильсбор (RUB): {result.get('util_fee', '-')}</p>"
-        
+
         html += "</div>"
         return format_html(html)
+
     calculation_display.short_description = "Детали расчета"
-    
+
     @admin.action(description="Отметить как обработанные")
     def mark_as_processed(self, request, queryset):
         updated = queryset.update(is_processed=True)
@@ -161,3 +164,58 @@ class LeadAdmin(admin.ModelAdmin):
             request,
             f"Отмечено как обработанные: {updated} заявок."
         )
+
+
+@admin.register(CalculationLog)
+class CalculationLogAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "user_link",
+        "created_at",
+        "subtotal_display",
+    )
+    list_filter = ("created_at",)
+    search_fields = ("user__username", "user__telegram_id")
+    readonly_fields = ("created_at", "params_pretty", "result_pretty")
+    date_hierarchy = "created_at"
+    ordering = ("-created_at",)
+    list_per_page = 50
+    actions = [export_as_csv, export_as_json]
+
+    fieldsets = (
+        ("Связи", {"fields": ("user", "created_at")}),
+        ("Параметры", {"fields": ("params_pretty",)}),
+        ("Результат", {"fields": ("result_pretty",)}),
+    )
+
+    def user_link(self, obj):
+        if obj.user:
+            return format_html(
+                '<a href="/admin/user/user/{}/change/">{}</a>',
+                obj.user.id,
+                obj.user.username or f"ID: {obj.user.telegram_id}",
+            )
+        return "-"
+
+    user_link.short_description = "Пользователь"
+
+    def subtotal_display(self, obj):
+        try:
+            total = obj.result.get("subtotal_customs")
+        except Exception:
+            total = None
+        return total if total is not None else "-"
+
+    subtotal_display.short_description = "Итого (RUB)"
+
+    def params_pretty(self, obj):
+        import json
+        return format_html("<pre>{}</pre>", json.dumps(obj.params, ensure_ascii=False, indent=2))
+
+    params_pretty.short_description = "Параметры расчёта"
+
+    def result_pretty(self, obj):
+        import json
+        return format_html("<pre>{}</pre>", json.dumps(obj.result, ensure_ascii=False, indent=2))
+
+    result_pretty.short_description = "Результат расчёта"
