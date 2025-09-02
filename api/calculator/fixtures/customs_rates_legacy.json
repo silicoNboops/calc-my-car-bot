@@ -1,8 +1,4 @@
 {
-  "settings": {
-    "vat_rate": 0.2,
-    "company_commission_rub": 69000
-  },
   "duty_rates": [
     {
       "audience": "PASSENGER_CAR_PHYS",
