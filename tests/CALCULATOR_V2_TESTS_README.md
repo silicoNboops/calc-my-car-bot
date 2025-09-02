@@ -1,0 +1,1 @@
+docker compose --env-file .env run --rm -e ENVIRONMENT=local -e USE_FIXED_CURRENCY_PROVIDER=1 api python -m pytest -q -p no:cov calculator/test_cars.py calculator/test_electric_quadricycles.py calculator/test_motorcycles.py calculator/test_snowmobiles.py
