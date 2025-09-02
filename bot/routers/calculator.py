@@ -416,7 +416,7 @@ async def input_engine_cc(message: Message, state: FSMContext) -> None:
             need_hp = True
         elif et == EngineTypeChoices.ELECTRO and vt in {VehicleTypeChoices.CAR, VehicleTypeChoices.MOTORCYCLE}:
             need_hp = True
-        elif vt == VehicleTypeChoices.CAR and is_jur and (
+        elif vt == VehicleTypeChoices.CAR and (
                 et in {EngineTypeChoices.BENZIN, EngineTypeChoices.DIESEL, EngineTypeChoices.HYBRID_PARALLEL,
                        EngineTypeChoices.HYBRID_SERIES}
         ):
