@@ -208,7 +208,7 @@ def format_result_block_rub_only(values: dict, *, commission_rub: Optional[float
         except Exception:
             commission_val = 0.0
         if commission_val > 0:
-            lines.append(f"💼 Услуги брокера (RUB): <b>💼 {fmt_money(commission_val)}</b>")
+            lines.append(f"💼 Услуги брокера (RUB):<b> {fmt_money(commission_val)}</b>")
             grand_total = subtotal_customs + commission_val
 
     # Пустая строка перед финальным итогом и сам итог
