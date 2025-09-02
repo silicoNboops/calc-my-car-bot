@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 from typing import TYPE_CHECKING
 
 from aiogram import Router, F
@@ -480,7 +481,6 @@ _calc_accise(self, hp, is_commercial, engine_type, ...)
     final_text = header + result_text + broker_line + itog_line + fx_line + CONTACT_LINE
 
     # Сохраняем данные расчета для возможной заявки и историю в БД
-    import datetime
     # Расширим параметры для сохранения (для удобства админки)
     params_for_log = {
         **payload,
