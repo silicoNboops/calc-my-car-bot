@@ -32,7 +32,10 @@ from bot.keyboards.calculator import (
     AgeKeyCD,
     age_key_kb,
     format_age_key_title,
+    HybridFuelCD,
     hybrid_fuel_kb,
+    YesNoCD,
+    yes_no_kb,
 )
 from bot.keyboards.calculator import vehicle_type_kb
 from bot.keyboards.lead import lead_after_calc_kb
@@ -55,6 +58,7 @@ from bot.utils.strings import (
     PROMPT_ENTER_ENGINE_HP,
     PROMPT_CHOOSE_AGE,
     PROMPT_CHOOSE_HYBRID_FUEL,
+    PROMPT_CHOOSE_DVS_GT_ED,
     CONTACT_LINE,
 )
 from calculator_v2.adapter import run_v6_with_bot_payload
