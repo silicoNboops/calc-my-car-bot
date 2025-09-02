@@ -120,7 +120,7 @@ class LeadAdmin(admin.ModelAdmin):
     user_link.short_description = "Пользователь"
 
     def has_calculation(self, obj):
-        return "✅" if obj.calculation_data else "❌"
+        return bool(obj.calculation_data)
 
     has_calculation.short_description = "Есть расчет"
     has_calculation.boolean = True
