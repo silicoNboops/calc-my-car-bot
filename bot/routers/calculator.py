@@ -51,6 +51,7 @@ from bot.utils.strings import (
     PROMPT_CHOOSE_ROLE,
     PROMPT_CHOOSE_ENGINE_TYPE,
     PROMPT_ENTER_ENGINE_CC,
+    PROMPT_ENTER_ENGINE_HP,
     PROMPT_CHOOSE_AGE,
     CONTACT_LINE,
 )
@@ -364,17 +365,83 @@ async def input_engine_cc(message: Message, state: FSMContext) -> None:
             await _edit_or_send(message, error_summary)
         return
 
-    # Валидно: сохраняем и показываем резюме
+    # Валидно: сохраняем и решаем — нужен ли шаг мощности
     await state.update_data(engine_cc=value)
     engine_cc_fmt = f"{format_amount(value)} см³"
+
+    # Определяем, нужен ли ввод мощности
+    vt = str(data.get("vehicle_type", ""))
+    et = str(data.get("engine_type", ""))
+    is_jur = bool(data.get("is_jur", False))
+
+    need_hp = False
+    try:
+        if vt == VehicleTypeChoices.MOTORCYCLE:
+            need_hp = True
+        elif et == EngineTypeChoices.ELECTRO and vt in {VehicleTypeChoices.CAR, VehicleTypeChoices.MOTORCYCLE}:
+            need_hp = True
+        elif vt == VehicleTypeChoices.CAR and is_jur and (
+                et in {EngineTypeChoices.BENZIN, EngineTypeChoices.DIESEL, EngineTypeChoices.HYBRID_PARALLEL,
+                       EngineTypeChoices.HYBRID_SERIES}
+        ):
+            need_hp = True
+    except Exception:
+        # На всякий случай не ломаем поток
+        need_hp = False
+
+    header2 = format_selection_header({**data, "engine_cc": value})
+    if need_hp:
+        prompt_text = header2 + PROMPT_ENTER_ENGINE_HP
+        if chat_id and msg_id:
+            await _edit_or_send(None, prompt_text, bot=message.bot, chat_id=chat_id, message_id=msg_id)
+        else:
+            await _edit_or_send(message, prompt_text)
+        await state.set_state(CalculatorState.ENGINE_HP)
+        return
+
+    # Иначе — сразу к возрасту
     if chat_id and msg_id:
-        # После ввода объёма предлагаем выбрать возраст авто
-        header2 = format_selection_header({**data, "engine_cc": value})
         prompt_text = header2 + PROMPT_CHOOSE_AGE
         await _edit_or_send(None, prompt_text, reply_markup=age_key_kb(), bot=message.bot, chat_id=chat_id,
                             message_id=msg_id)
     else:
-        header2 = format_selection_header({**data, "engine_cc": value})
+        await _edit_or_send(message, header2)
+        await _edit_or_send(message, PROMPT_CHOOSE_AGE, reply_markup=age_key_kb())
+    await state.set_state(CalculatorState.AGE_KEY)
+
+
+@router.message(CalculatorState.ENGINE_HP, F.text)
+async def input_engine_hp(message: Message, state: FSMContext) -> None:
+    data = await state.get_data()
+    chat_id = data.get("prompt_chat_id")
+    msg_id = data.get("prompt_message_id")
+
+    raw = (message.text or "").strip()
+    try:
+        await message.delete()
+    except Exception:
+        pass
+
+    value = parse_int_amount(raw)
+    if value is None:
+        reason = build_number_error(raw, what="мощность (л.с.)")
+        header = format_selection_header(data)
+        error_summary = header + f"<b>— Мощность: ❌ ОШИБКА</b>\n{reason}\n\n{PROMPT_ENTER_ENGINE_HP}"
+        if chat_id and msg_id:
+            await _edit_or_send(None, error_summary, bot=message.bot, chat_id=chat_id, message_id=msg_id)
+        else:
+            await _edit_or_send(message, error_summary)
+        return
+
+    # Сохраняем и переходим к возрасту
+    await state.update_data(hp=value)
+    data2 = await state.get_data()
+    header2 = format_selection_header(data2)
+    if chat_id and msg_id:
+        prompt_text = header2 + PROMPT_CHOOSE_AGE
+        await _edit_or_send(None, prompt_text, reply_markup=age_key_kb(), bot=message.bot, chat_id=chat_id,
+                            message_id=msg_id)
+    else:
         await _edit_or_send(message, header2)
         await _edit_or_send(message, PROMPT_CHOOSE_AGE, reply_markup=age_key_kb())
     await state.set_state(CalculatorState.AGE_KEY)
@@ -413,8 +480,7 @@ _calc_accise(self, hp, is_commercial, engine_type, ...)
         "price": float(price),
         "currency": str(data.get("currency", "RUB")),
         "engine_cc": int(engine_cc),
-        # TODO потом будем задавать шагом от юзера
-        "hp": 0,
+        "hp": int(data.get("hp", 0)),
         "engine_type": str(data.get("engine_type", "")),
         "age_key": str(callback_data.key),
         "is_jur": bool(data.get("is_jur", False)),
@@ -517,7 +583,7 @@ async def restart_calculation(call: CallbackQuery, state: FSMContext) -> None:
     # Очищаем текущие данные расчета, но оставляем предыдущие
     calculation_keys_to_clear = [
         'vehicle_type', 'currency', 'price', 'importer_kind', 'engine_type',
-        'engine_cc', 'age_key', 'is_jur', 'is_personal_use', 'vehicle_title',
+        'engine_cc', 'hp', 'age_key', 'is_jur', 'is_personal_use', 'vehicle_title',
         'currency_title', 'prompt_chat_id', 'prompt_message_id',
         'calculation_params', 'calculation_result', 'calculation_created_at'
     ]
