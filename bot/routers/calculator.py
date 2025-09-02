@@ -116,11 +116,30 @@ def _estimate_sync(payload: dict) -> tuple[str, dict[str, float], float]:
     return _format_calc_result(res), provider.get_rates(), float(res.subtotal_customs)
 
 
-def _estimate_v6_sync(payload: dict) -> tuple[str, dict[str, float], float]:
-    """Синхронный расчёт через v6-адаптер без Django/ORM."""
+def _estimate_v6_sync(payload: dict) -> tuple[str, dict[str, float], float, dict]:
+    """Синхронный расчёт через v6-адаптер без Django/ORM.
+
+    Возвращает текст, курсы, итог в RUB и подробный словарь результата для сохранения.
+    """
     res_v6 = run_v6_with_bot_payload(payload)
     rates = RatesFetcher.get_currency_rates()
-    return _format_calc_result_v6(res_v6), rates, float(res_v6.total_rub)
+
+    # Приводим результат к формату как у старого калькулятора, чтобы единообразно сохранять
+    duty_eur = float((res_v6.breakdown or {}).get("duty_eur", 0.0) or 0.0)
+    price_eur = float((res_v6.breakdown or {}).get("cost_eur", 0.0) or 0.0)
+    result_data = {
+        "subtotal_customs": float(res_v6.total_rub),
+        "duty_rub": float(res_v6.duty_rub),
+        "duty_eur": duty_eur,
+        "vat_rub": float(res_v6.vat_rub),
+        "util_fee": float(res_v6.util_fee_rub),
+        "accise_rub": float(res_v6.excise_rub),
+        "customs_fee": float(res_v6.customs_fee_rub),
+        "price_rub": float(res_v6.cost_rub),
+        "price_eur": price_eur,
+    }
+
+    return _format_calc_result_v6(res_v6), rates, float(res_v6.total_rub), result_data
 
 
 def _estimate_sync_with_data(payload: dict) -> tuple[str, dict[str, float], float, dict]:
@@ -403,7 +422,7 @@ _calc_accise(self, hp, is_commercial, engine_type, ...)
     }
     try:
         # Используем новый калькулятор v6 напрямую
-        result_text, rates, subtotal_customs = await sync_to_async(_estimate_v6_sync)(payload)
+        result_text, rates, subtotal_customs, result_data = await sync_to_async(_estimate_v6_sync)(payload)
     except Exception as e:  # noqa: BLE001
         await call.message.edit_text(f"Ошибка расчёта: {e}")
         await call.answer()
@@ -460,13 +479,37 @@ _calc_accise(self, hp, is_commercial, engine_type, ...)
 
     final_text = header + result_text + broker_line + itog_line + fx_line + CONTACT_LINE
 
-    # Сохраняем данные расчета для возможной заявки
+    # Сохраняем данные расчета для возможной заявки и историю в БД
     import datetime
+    # Расширим параметры для сохранения (для удобства админки)
+    params_for_log = {
+        **payload,
+        "importer_kind": str(data.get("importer_kind", "")),
+        "vehicle_title": vehicle_title,
+        "currency_title": currency_title,
+    }
     await state.update_data(
-        calculation_params=payload,
-        calculation_result=calc_result,
-        calculation_created_at=datetime.datetime.now().isoformat()
+        calculation_params=params_for_log,
+        calculation_result=result_data,
+        calculation_created_at=datetime.datetime.now().isoformat(),
     )
+
+    # Пишем CalculationLog, если знаем пользователя
+    try:
+        if call.from_user is not None:
+            try:
+                user = await User.objects.aget(telegram_id=call.from_user.id)
+            except User.DoesNotExist:
+                user = None
+            if user is not None:
+                await CalculationLog.objects.acreate(
+                    user=user,
+                    params=params_for_log,
+                    result=result_data,
+                )
+    except Exception:
+        # Не блокируем UX при ошибке записи истории
+        pass
 
     await _edit_or_send(call.message, final_text, reply_markup=lead_after_calc_kb())
     await call.answer()
