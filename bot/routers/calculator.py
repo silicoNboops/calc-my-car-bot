@@ -43,6 +43,7 @@ from bot.utils.formatting import (
     format_selection_header,
     parse_int_amount,
     build_number_error,
+    format_result_block_rub_only,
 )
 from bot.utils.strings import (
     PROMPT_CHOOSE_CURRENCY,
@@ -84,14 +85,11 @@ def _format_calc_result_v6(res: CalculationResult) -> str:
     return (
         "🧮 Итог расчёта:\n"
         f"Цена (RUB): <b>{fmt_money(res.cost_rub)}</b>\n"
-        f"Цена (EUR): <b>{fmt_money(price_eur)}</b>\n"
-        f"Пошлина (EUR): <b>{fmt_money(duty_eur)}</b>\n"
         f"Пошлина (RUB): <b>{fmt_money(res.duty_rub)}</b>\n"
         f"Утильсбор (RUB): <b>{fmt_money(res.util_fee_rub)}</b>\n"
         f"Акциз (RUB): <b>{fmt_money(res.excise_rub)}</b>\n"
         f"НДС (RUB): <b>{fmt_money(res.vat_rub)}</b>\n"
         f"Таможенный сбор (RUB): <b>{fmt_money(res.customs_fee_rub)}</b>\n"
-        f"Всего (RUB): <b>{fmt_money(res.total_rub)}</b>\n"
     )
 
 
@@ -141,7 +139,8 @@ def _estimate_v6_sync(payload: dict) -> tuple[str, dict[str, float], float, dict
         "price_eur": price_eur,
     }
 
-    return _format_calc_result_v6(res_v6), rates, float(res_v6.total_rub), result_data
+    # Возвращаем пустой текст — итоговый блок построим выше из словаря и комиссии брокера
+    return "", rates, float(res_v6.total_rub), result_data
 
 
 def _estimate_sync_with_data(payload: dict) -> tuple[str, dict[str, float], float, dict]:
@@ -424,7 +423,7 @@ _calc_accise(self, hp, is_commercial, engine_type, ...)
     }
     try:
         # Используем новый калькулятор v6 напрямую
-        result_text, rates, subtotal_customs, result_data = await sync_to_async(_estimate_v6_sync)(payload)
+        _text_unused, rates, subtotal_customs, result_data = await sync_to_async(_estimate_v6_sync)(payload)
     except Exception as e:  # noqa: BLE001
         await call.message.edit_text(f"Ошибка расчёта: {e}")
         await call.answer()
@@ -441,29 +440,13 @@ _calc_accise(self, hp, is_commercial, engine_type, ...)
     except Exception:
         fx_line = ""
 
-    # Блок услуг брокера (комиссия из Settings)
-    broker_line = ""
+    # Комиссия брокера (Settings) и построение единого блока результата в RUB
     try:
         commission_rub = await sync_to_async(_get_company_commission_rub)()
-        if commission_rub > 0:
-            broker_line = (
-                "\n💼 Услуги брокера:\n"
-                f"Комиссия компании (RUB): <b>💼 {fmt_money(commission_rub)}</b>\n"
-            )
     except Exception:
-        broker_line = ""
+        commission_rub = 0.0
 
-    # Итог с учётом услуг брокера
-    itog_line = ""
-    try:
-        if broker_line:
-            grand_total = float(subtotal_customs) + float(commission_rub)
-            itog_line = (
-                "\n✅ Итог:\n"
-                f"С услугами брокера (RUB): <b>{fmt_money(grand_total)}</b>\n"
-            )
-    except Exception:
-        itog_line = ""
+    result_block = format_result_block_rub_only(result_data, commission_rub=commission_rub)
 
     header = format_selection_header(
         {
@@ -479,7 +462,7 @@ _calc_accise(self, hp, is_commercial, engine_type, ...)
         age_title=age_title,
     )
 
-    final_text = header + result_text + broker_line + itog_line + fx_line + CONTACT_LINE
+    final_text = header + result_block + fx_line + CONTACT_LINE
 
     # Сохраняем данные расчета для возможной заявки и историю в БД
     # Расширим параметры для сохранения (для удобства админки)
