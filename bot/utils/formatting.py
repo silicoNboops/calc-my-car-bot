@@ -119,6 +119,22 @@ def format_selection_header(data: dict, *, age_title: Optional[str] = None) -> s
             f"— Тип двигателя: <b>{format_engine_type_title(str(engine_type))}</b>"
         )
 
+    # Доп. поля для гибридов
+    hybrid_fuel = data.get("hybrid_ice_fuel")
+    if hybrid_fuel:
+        try:
+            lines.append(f"— ДВС в гибриде: <b>🛢️ {str(hybrid_fuel)}</b>")
+        except Exception:
+            pass
+
+    dvs_gt_electric = data.get("dvs_gt_electric")
+    if dvs_gt_electric is not None:
+        try:
+            yn = "да" if bool(dvs_gt_electric) else "нет"
+            lines.append(f"— ДВС > ЭД: <b>{yn}</b>")
+        except Exception:
+            pass
+
     engine_cc = data.get("engine_cc")
     if engine_cc:
         try:

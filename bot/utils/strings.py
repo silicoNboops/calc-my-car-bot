@@ -10,6 +10,8 @@ PROMPT_ENTER_ENGINE_CC = "Введите объём двигателя в см³
 PROMPT_ENTER_ENGINE_HP = "Введите мощность двигателя в л.с. (например, 150):"
 PROMPT_CHOOSE_AGE = "Выберите возраст автомобиля:"
 PROMPT_CHOOSE_VEHICLE_TYPE = "Выберите тип автомобиля:"
+PROMPT_CHOOSE_HYBRID_FUEL = "Выберите топливо ДВС в гибриде:"
+PROMPT_CHOOSE_DVS_GT_ED = "Мощность ДВС больше максимальной 30-минутной мощности ЭД?"
 
 CONTACT_LINE = "\nСвяжитесь с нами: <b>@jonnyfase</b>"
 

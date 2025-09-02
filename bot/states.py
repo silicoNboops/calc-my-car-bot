@@ -14,6 +14,8 @@ class CalculatorState(StatesGroup):
     PRICE = State()
     ROLE = State()
     ENGINE_TYPE = State()
+    HYBRID_ICE_FUEL = State()
+    HYBRID_DVS_GT_ED = State()
     ENGINE_CC = State()
     ENGINE_HP = State()
     AGE_KEY = State()

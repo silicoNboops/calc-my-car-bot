@@ -32,6 +32,10 @@ from bot.keyboards.calculator import (
     AgeKeyCD,
     age_key_kb,
     format_age_key_title,
+    HybridFuelCD,
+    hybrid_fuel_kb,
+    YesNoCD,
+    yes_no_kb,
 )
 from bot.keyboards.calculator import vehicle_type_kb
 from bot.keyboards.lead import lead_after_calc_kb
@@ -53,6 +57,8 @@ from bot.utils.strings import (
     PROMPT_ENTER_ENGINE_CC,
     PROMPT_ENTER_ENGINE_HP,
     PROMPT_CHOOSE_AGE,
+    PROMPT_CHOOSE_HYBRID_FUEL,
+    PROMPT_CHOOSE_DVS_GT_ED,
     CONTACT_LINE,
 )
 from calculator_v2.adapter import run_v6_with_bot_payload
@@ -324,8 +330,17 @@ async def choose_role(call: CallbackQuery, state: FSMContext, callback_data: Rol
 async def choose_engine_type(call: CallbackQuery, state: FSMContext, callback_data: EngineTypeCD) -> None:
     await state.update_data(engine_type=callback_data.kind)
     data = await state.get_data()
-    # Запрос объёма двигателя
     header = format_selection_header(data)
+    # Если гибрид — сначала уточняем топливо ДВС, затем флаг ДВС>ЭД
+    if callback_data.kind in {EngineTypeChoices.HYBRID_PARALLEL, EngineTypeChoices.HYBRID_SERIES}:
+        msg = await _edit_or_send(call.message, header + PROMPT_CHOOSE_HYBRID_FUEL, reply_markup=hybrid_fuel_kb())
+        await state.update_data(prompt_chat_id=msg.chat.id, prompt_message_id=msg.message_id)
+        await call.answer()
+        await state.set_state(CalculatorState.HYBRID_ICE_FUEL)
+        return
+    # Для остальных типов — сразу к объёму двигателя
+    # Очистим гибридные поля, если ранее что-то было выбрано
+    await state.update_data(hybrid_ice_fuel=None, dvs_gt_electric=None)
     prompt_text = header + PROMPT_ENTER_ENGINE_CC
     msg = await _edit_or_send(call.message, prompt_text)
     await state.update_data(prompt_chat_id=msg.chat.id, prompt_message_id=msg.message_id)
@@ -410,6 +425,31 @@ async def input_engine_cc(message: Message, state: FSMContext) -> None:
     await state.set_state(CalculatorState.AGE_KEY)
 
 
+@router.callback_query(CalculatorState.HYBRID_ICE_FUEL, HybridFuelCD.filter())
+async def choose_hybrid_fuel(call: CallbackQuery, state: FSMContext, callback_data: HybridFuelCD) -> None:
+    # Сохраняем топливо ДВС в гибриде и спрашиваем про "ДВС > ЭД?"
+    await state.update_data(hybrid_ice_fuel=callback_data.fuel)
+    data = await state.get_data()
+    header = format_selection_header(data)
+    msg = await _edit_or_send(call.message, header + PROMPT_CHOOSE_DVS_GT_ED, reply_markup=yes_no_kb())
+    await state.update_data(prompt_chat_id=msg.chat.id, prompt_message_id=msg.message_id)
+    await call.answer()
+    await state.set_state(CalculatorState.HYBRID_DVS_GT_ED)
+
+
+@router.callback_query(CalculatorState.HYBRID_DVS_GT_ED, YesNoCD.filter())
+async def choose_hybrid_dvs_vs_ed(call: CallbackQuery, state: FSMContext, callback_data: YesNoCD) -> None:
+    # Сохраняем булев флаг и переходим к вводу объёма двигателя
+    val = True if callback_data.val == "yes" else False
+    await state.update_data(dvs_gt_electric=val)
+    data = await state.get_data()
+    header = format_selection_header(data)
+    msg = await _edit_or_send(call.message, header + PROMPT_ENTER_ENGINE_CC)
+    await state.update_data(prompt_chat_id=msg.chat.id, prompt_message_id=msg.message_id)
+    await call.answer()
+    await state.set_state(CalculatorState.ENGINE_CC)
+
+
 @router.message(CalculatorState.ENGINE_HP, F.text)
 async def input_engine_hp(message: Message, state: FSMContext) -> None:
     data = await state.get_data()
@@ -486,6 +526,9 @@ _calc_accise(self, hp, is_commercial, engine_type, ...)
         "is_jur": bool(data.get("is_jur", False)),
         "is_personal_use": data.get("is_personal_use", None),
         "vehicle_type": str(data.get("vehicle_type", "car")),
+        # гибридные уточнения (если были заданы)
+        "hybrid_ice_fuel": data.get("hybrid_ice_fuel"),
+        "dvs_gt_electric": data.get("dvs_gt_electric"),
     }
     try:
         # Используем новый калькулятор v6 напрямую
@@ -514,19 +557,8 @@ _calc_accise(self, hp, is_commercial, engine_type, ...)
 
     result_block = format_result_block_rub_only(result_data, commission_rub=commission_rub)
 
-    header = format_selection_header(
-        {
-            "vehicle_title": vehicle_title,
-            "vehicle_type": data.get("vehicle_type"),
-            "currency_title": currency_title,
-            "currency": data.get("currency"),
-            "price": price,
-            "importer_kind": data.get("importer_kind"),
-            "engine_type": data.get("engine_type"),
-            "engine_cc": engine_cc,
-        },
-        age_title=age_title,
-    )
+    # Используем весь state (включая hp и гибридные поля) + принудительно актуальный engine_cc
+    header = format_selection_header({**data, "engine_cc": engine_cc}, age_title=age_title)
 
     final_text = header + result_block + fx_line + CONTACT_LINE
 
@@ -585,7 +617,9 @@ async def restart_calculation(call: CallbackQuery, state: FSMContext) -> None:
         'vehicle_type', 'currency', 'price', 'importer_kind', 'engine_type',
         'engine_cc', 'hp', 'age_key', 'is_jur', 'is_personal_use', 'vehicle_title',
         'currency_title', 'prompt_chat_id', 'prompt_message_id',
-        'calculation_params', 'calculation_result', 'calculation_created_at'
+        'calculation_params', 'calculation_result', 'calculation_created_at',
+        # гибридные уточнения
+        'hybrid_ice_fuel', 'dvs_gt_electric'
     ]
 
     for key in calculation_keys_to_clear:

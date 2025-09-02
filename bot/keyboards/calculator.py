@@ -140,3 +140,29 @@ def format_age_key_title(key: str) -> str:
     title = dict(AgeKey.choices).get(key, key)
     emoji = _AGE_EMOJI.get(key, "")
     return f"{emoji} {title}".strip()
+
+
+# HYBRID additions: fuel (ICE) selection and Yes/No switches
+class HybridFuelCD(CallbackData, prefix="hf"):
+    fuel: str  # "Бензин" | "Дизель"
+
+
+def hybrid_fuel_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    # Явно два варианта топлива ДВС в гибриде
+    builder.button(text="🛢️ Бензин", callback_data=HybridFuelCD(fuel="Бензин").pack())
+    builder.button(text="🛢️ Дизель", callback_data=HybridFuelCD(fuel="Дизель").pack())
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+class YesNoCD(CallbackData, prefix="yn"):
+    val: str  # "yes" | "no"
+
+
+def yes_no_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="✅ Да", callback_data=YesNoCD(val="yes").pack())
+    builder.button(text="❌ Нет", callback_data=YesNoCD(val="no").pack())
+    builder.adjust(2)
+    return builder.as_markup()
