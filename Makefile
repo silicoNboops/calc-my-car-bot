@@ -29,7 +29,10 @@ run.celery.beat.local:
 
 # Manual trigger for daily rates task (docker env)
 task.rates:
-	docker compose --env-file .env run --rm celery celery -A tasks.app call tasks.daily.send_daily_rates
+	docker compose --env-file .env run --rm \
+	  -e TELEGRAM_API_TOKEN \
+	  -e TELEGRAM_RATES_CHANNEL \
+	  celery celery -A tasks.app call tasks.daily.send_daily_rates
 
 makemigrations:
 	python manage.py makemigrations
