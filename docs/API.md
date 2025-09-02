@@ -11,7 +11,7 @@
     - `engine_cc: int`
     - `hp: int`
     - `engine_type: string` (например, `Бензин`|`Дизель`)
-    - `age_key: under_3|3_to_5|5_to_7|over_7|over_5`
+    - `age_key: under_3|3_to_5|5_to_7|over_7`
     - `is_jur: bool`
     - `is_personal_use: bool`
 - Ответ (см. `EstimateResponseSerializer`).

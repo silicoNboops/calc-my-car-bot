@@ -16,32 +16,54 @@ class User(AbstractUser):
 
 class Lead(models.Model):
     """Модель для заявок пользователей."""
-    
+
     user = models.ForeignKey(
-        User, 
-        on_delete=models.CASCADE, 
+        User,
+        on_delete=models.CASCADE,
         related_name='leads',
         verbose_name="Пользователь"
     )
     name = models.CharField(max_length=100, verbose_name="Имя")
     phone = models.CharField(max_length=20, verbose_name="Телефон")
-    
+
     # Данные расчета (если заявка оставлена после расчета)
     calculation_data = models.JSONField(
-        null=True, 
-        blank=True, 
+        null=True,
+        blank=True,
         verbose_name="Данные расчета",
         help_text="JSON с параметрами и результатами расчета"
     )
-    
+
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата создания")
     is_processed = models.BooleanField(default=False, verbose_name="Обработана")
     notes = models.TextField(blank=True, verbose_name="Заметки менеджера")
-    
+
     class Meta:
         verbose_name = "Заявка"
         verbose_name_plural = "Заявки"
         ordering = ['-created_at']
-    
+
     def __str__(self) -> str:
         return f"Заявка от {self.name} ({self.phone}) - {self.created_at.strftime('%d.%m.%Y %H:%M')}"
+
+
+class CalculationLog(models.Model):
+    """История расчетов, сохраняемая автоматически после выполнения расчета в боте."""
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="calculation_logs",
+        verbose_name="Пользователь",
+    )
+    params = models.JSONField(verbose_name="Параметры расчета")
+    result = models.JSONField(verbose_name="Результат расчета")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата расчета")
+
+    class Meta:
+        verbose_name = "История расчета"
+        verbose_name_plural = "История расчетов"
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:  # pragma: no cover
+        return f"Calc #{self.id} от {self.user_id} — {self.created_at.strftime('%d.%m.%Y %H:%M')}"
