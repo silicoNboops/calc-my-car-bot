@@ -339,6 +339,8 @@ async def choose_engine_type(call: CallbackQuery, state: FSMContext, callback_da
         await state.set_state(CalculatorState.HYBRID_ICE_FUEL)
         return
     # Для остальных типов — сразу к объёму двигателя
+    # Очистим гибридные поля, если ранее что-то было выбрано
+    await state.update_data(hybrid_ice_fuel=None, dvs_gt_electric=None)
     prompt_text = header + PROMPT_ENTER_ENGINE_CC
     msg = await _edit_or_send(call.message, prompt_text)
     await state.update_data(prompt_chat_id=msg.chat.id, prompt_message_id=msg.message_id)
