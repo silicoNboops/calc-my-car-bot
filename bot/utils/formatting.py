@@ -165,3 +165,55 @@ def build_number_error(raw: str, *, what: str) -> str:
     if not cleaned.isdigit():
         return "Ошибка: введите целое число, можно с пробелами/запятыми/точками как разделителями тысяч."
     return f"Ошибка: {what} должна быть > 0."
+
+
+def format_result_block_rub_only(values: dict, *, commission_rub: Optional[float] = None) -> str:
+    """Строит единый блок результата расчёта только в RUB.
+
+    Ожидаемые ключи в values:
+      - price_rub, duty_rub, util_fee, accise_rub, vat_rub, customs_fee, subtotal_customs
+
+    Если передан commission_rub, строка услуг брокера и финальный итог включаются в этот же блок.
+    """
+
+    # Безопасно читаем значения и приводим к float
+    def _f(key: str) -> float:
+        try:
+            return float(values.get(key, 0.0) or 0.0)
+        except Exception:
+            return 0.0
+
+    price_rub = _f("price_rub")
+    duty_rub = _f("duty_rub")
+    util_fee = _f("util_fee")
+    accise_rub = _f("accise_rub")
+    vat_rub = _f("vat_rub")
+    customs_fee = _f("customs_fee")
+    subtotal_customs = _f("subtotal_customs")
+
+    lines: list[str] = [
+        "🧮 Итог расчёта:",
+        f"Цена (RUB): <b>{fmt_money(price_rub)}</b>",
+        f"Пошлина (RUB): <b>{fmt_money(duty_rub)}</b>",
+        f"Утильсбор (RUB): <b>{fmt_money(util_fee)}</b>",
+        f"Акциз (RUB): <b>{fmt_money(accise_rub)}</b>",
+        f"НДС (RUB): <b>{fmt_money(vat_rub)}</b>",
+        f"Таможенный сбор (RUB): <b>{fmt_money(customs_fee)}</b>",
+    ]
+
+    grand_total = subtotal_customs
+    if commission_rub is not None and commission_rub > 0:
+        try:
+            commission_val = float(commission_rub)
+        except Exception:
+            commission_val = 0.0
+        if commission_val > 0:
+            lines.append(f"💼 Услуги брокера (RUB): <b>💼 {fmt_money(commission_val)}</b>")
+            grand_total = subtotal_customs + commission_val
+
+    # Пустая строка перед финальным итогом и сам итог
+    lines.append("")
+    lines.append("✅ Итог:")
+    lines.append(f"(RUB): <b>{fmt_money(grand_total)}</b>")
+
+    return "\n".join(lines) + "\n"
