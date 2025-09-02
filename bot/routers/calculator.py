@@ -331,6 +331,27 @@ async def choose_engine_type(call: CallbackQuery, state: FSMContext, callback_da
     await state.update_data(engine_type=callback_data.kind)
     data = await state.get_data()
     header = format_selection_header(data)
+    # EV: объём двигателя не требуется вовсе
+    # - для car/motorcycle сразу спрашиваем мощность (hp)
+    # - для quad/snowmobile пропускаем hp и переходим к возрасту
+    vt = str(data.get("vehicle_type", ""))
+    if callback_data.kind == EngineTypeChoices.ELECTRO:
+        # Очистим гибридные поля и зафиксируем engine_cc = 0
+        await state.update_data(hybrid_ice_fuel=None, dvs_gt_electric=None, engine_cc=0)
+        if vt in {VehicleTypeChoices.CAR, VehicleTypeChoices.MOTORCYCLE}:
+            msg = await _edit_or_send(call.message, header + PROMPT_ENTER_ENGINE_HP)
+            await state.update_data(prompt_chat_id=msg.chat.id, prompt_message_id=msg.message_id)
+            await call.answer()
+            await state.set_state(CalculatorState.ENGINE_HP)
+            return
+        else:
+            # EV для quad/snowmobile — сразу возраст
+            msg = await _edit_or_send(call.message, header + PROMPT_CHOOSE_AGE, reply_markup=age_key_kb())
+            await state.update_data(prompt_chat_id=msg.chat.id, prompt_message_id=msg.message_id)
+            await call.answer()
+            await state.set_state(CalculatorState.AGE_KEY)
+            return
+
     # Если гибрид — сначала уточняем топливо ДВС, затем флаг ДВС>ЭД
     if callback_data.kind in {EngineTypeChoices.HYBRID_PARALLEL, EngineTypeChoices.HYBRID_SERIES}:
         msg = await _edit_or_send(call.message, header + PROMPT_CHOOSE_HYBRID_FUEL, reply_markup=hybrid_fuel_kb())

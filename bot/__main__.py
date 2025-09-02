@@ -30,7 +30,7 @@ dispatcher.include_router(router)
 async def set_bot_commands() -> None:
     await bot.set_my_commands(
         [
-            BotCommand(command="/start", description="Запуск и регистрация"),
+            BotCommand(command="/start", description="Запуск / Сброс"),
             # BotCommand(command="/calc", description="Быстрый расчёт в одну строку"),
             # BotCommand(command="/cancel", description="Сбросить текущий визард"),
         ],
