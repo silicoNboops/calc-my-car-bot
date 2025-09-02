@@ -7,12 +7,13 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from asgiref.sync import sync_to_async
 
+from api.calculator.models import Settings
 from api.calculator.services import (
     CalculatorService,
     EstimateInput,
     get_default_currency_provider,
 )
-from bot.utils.formatting import fmt_money
+from bot.utils.formatting import format_result_block_rub_only
 from bot.utils.strings import (
     CALC_USAGE_HELP,
     CALC_PARSE_ERROR,
@@ -73,19 +74,13 @@ def _parse_calc_args(text: str) -> dict | str:
         return CALC_PARSE_ERROR
 
 
-def _format_result(res) -> str:  # type: ignore[no-untyped-def]
-    return (
-        "🧮 Итог расчёта:\n"
-        f"Цена (RUB): <b>{fmt_money(res.price_rub)}</b>\n"
-        f"Цена (EUR): <b>{fmt_money(res.price_eur)}</b>\n"
-        f"Пошлина (EUR): <b>{fmt_money(res.duty_eur)}</b>\n"
-        f"Пошлина (RUB): <b>{fmt_money(res.duty_rub)}</b>\n"
-        f"Утильсбор (RUB): <b>{fmt_money(res.util_fee)}</b>\n"
-        f"Акциз (RUB): <b>{fmt_money(res.accise_rub)}</b>\n"
-        f"НДС (RUB): <b>{fmt_money(res.vat_rub)}</b>\n"
-        f"Таможенный сбор (RUB): <b>{fmt_money(res.customs_fee)}</b>\n"
-        f"Всего (RUB): <b>{fmt_money(res.subtotal_customs)}</b>\n"
-    )
+def _get_company_commission_rub() -> float:
+    """Читает комиссию компании (руб) из Settings с нормализацией тысяч."""
+    s = Settings.objects.order_by("-updated_at").first()
+    raw = float(getattr(s, "company_commission_rub", 0.0) or 0.0)
+    if raw < 1000.0:
+        return raw * 1000.0
+    return raw
 
 
 def _estimate_sync(payload: dict) -> str:
@@ -93,7 +88,17 @@ def _estimate_sync(payload: dict) -> str:
     service = CalculatorService(currency_provider=get_default_currency_provider())
     calc = service.build_calculator()
     res = calc.estimate(EstimateInput(**payload))
-    return _format_result(res)
+    values = {
+        "price_rub": float(res.price_rub),
+        "duty_rub": float(res.duty_rub),
+        "util_fee": float(res.util_fee),
+        "accise_rub": float(res.accise_rub),
+        "vat_rub": float(res.vat_rub),
+        "customs_fee": float(res.customs_fee),
+        "subtotal_customs": float(res.subtotal_customs),
+    }
+    commission = _get_company_commission_rub()
+    return format_result_block_rub_only(values, commission_rub=commission)
 
 
 @router.message(Command(commands=["calc"]))
