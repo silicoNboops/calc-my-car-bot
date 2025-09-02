@@ -80,6 +80,7 @@ def format_selection_header(data: dict, *, age_title: Optional[str] = None) -> s
     - importer_kind
     - engine_type
     - engine_cc (int)
+    - hp (int)
     - age_title (через аргумент)
     """
     lines: list[str] = ["Выбор сделан:"]
@@ -122,6 +123,13 @@ def format_selection_header(data: dict, *, age_title: Optional[str] = None) -> s
     if engine_cc:
         try:
             lines.append(f"— Объём: <b>🧱 {format_amount(int(engine_cc))} см³</b>")
+        except Exception:
+            pass
+
+    hp = data.get("hp")
+    if hp:
+        try:
+            lines.append(f"— Мощность: <b>⚡ {format_amount(int(hp))} л.с.</b>")
         except Exception:
             pass
 
