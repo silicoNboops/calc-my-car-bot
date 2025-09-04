@@ -251,7 +251,7 @@ def format_result_block_rub_only(
         except Exception:
             broker_val = 0.0
         if broker_val > 0:
-            lines.append(f"💼 Услуги брокера (RUB):<b> {fmt_money(broker_val)}</b>")
+            lines.append(f"💼 Услуги брокера (RUB): <b>{fmt_money(broker_val)}</b>")
             grand_total += broker_val
 
     # 2) Услуги подбора и сопровождения
