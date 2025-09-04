@@ -83,6 +83,15 @@ def _get_company_commission_rub() -> float:
     return raw
 
 
+def _get_broker_service_fee_rub() -> float:
+    """Фиксированная стоимость услуг брокера (оформление).
+
+    Пока задаём константой 69 000 ₽. При необходимости в будущем
+    можно вынести в Settings и админку.
+    """
+    return 69000.0
+
+
 def _estimate_sync(payload: dict) -> str:
     """Синхронная часть: берёт ORM-данные и считает результат."""
     service = CalculatorService(currency_provider=get_default_currency_provider())
@@ -98,7 +107,12 @@ def _estimate_sync(payload: dict) -> str:
         "subtotal_customs": float(res.subtotal_customs),
     }
     commission = _get_company_commission_rub()
-    return format_result_block_rub_only(values, commission_rub=commission)
+    broker_fee = _get_broker_service_fee_rub()
+    return format_result_block_rub_only(
+        values,
+        commission_rub=commission,
+        broker_fee_rub=broker_fee,
+    )
 
 
 @router.message(Command(commands=["calc"]))
