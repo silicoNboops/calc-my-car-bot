@@ -166,3 +166,27 @@ def yes_no_kb() -> InlineKeyboardMarkup:
     builder.button(text="❌ Нет", callback_data=YesNoCD(val="no").pack())
     builder.adjust(2)
     return builder.as_markup()
+
+
+# POWER UNIT toggle (л.с. / кВт)
+class PowerUnitCD(CallbackData, prefix="pu"):
+    unit: str  # "hp" | "kw"
+
+
+def power_unit_kb(selected: str = "hp", *, use_kw_30min: bool = False) -> InlineKeyboardMarkup:
+    """Двухкнопочный переключатель единиц мощности.
+
+    selected: "hp" (л.с.) или "kw" (кВт / 30 мин). Выбранная кнопка помечается ✅.
+    Примечание: ярлык для кВт всегда отображается как «кВт / 30 мин». Аргумент
+    use_kw_30min сохранён для обратной совместимости и на текст ярлыка не влияет.
+    """
+    selected = "kw" if str(selected).lower() == "kw" else "hp"
+    hp_text = ("✅ л.с." if selected == "hp" else "л.с.")
+    # Всегда показываем явную формулировку кВт / 30 мин на кнопке
+    kw_label = "кВт / 30 мин"
+    kw_text = (f"✅ {kw_label}" if selected == "kw" else kw_label)
+    builder = InlineKeyboardBuilder()
+    builder.button(text=hp_text, callback_data=PowerUnitCD(unit="hp").pack())
+    builder.button(text=kw_text, callback_data=PowerUnitCD(unit="kw").pack())
+    builder.adjust(2)
+    return builder.as_markup()
