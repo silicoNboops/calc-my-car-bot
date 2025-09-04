@@ -105,6 +105,31 @@ services:
     restart: unless-stopped
     depends_on:
       - api
+      - redis
+      - rabbitmq
+    env_file:
+      - .env
+    environment:
+      CELERY_TASK_ALWAYS_EAGER: ${CELERY_TASK_ALWAYS_EAGER:-false}
+      CELERY_TASK_EAGER_PROPAGATES: ${CELERY_TASK_EAGER_PROPAGATES:-false}
+    volumes:
+      - .:/application
+    networks:
+      - main
+
+  celery_beat:
+    build: .
+    command: make run.celery.beat.local
+    restart: unless-stopped
+    depends_on:
+      - api
+      - redis
+      - rabbitmq
+    env_file:
+      - .env
+    environment:
+      CELERY_TASK_ALWAYS_EAGER: ${CELERY_TASK_ALWAYS_EAGER:-false}
+      CELERY_TASK_EAGER_PROPAGATES: ${CELERY_TASK_EAGER_PROPAGATES:-false}
     volumes:
       - .:/application
     networks:
