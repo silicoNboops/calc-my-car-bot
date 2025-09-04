@@ -202,6 +202,15 @@ def _get_company_commission_rub() -> float:
     return raw
 
 
+def _get_broker_service_fee_rub() -> float:
+    """Фиксированная стоимость услуг брокера (оформление документов).
+
+    Пока фиксированная сумма 69 000 ₽. При необходимости позже
+    можно вынести в Settings и управлять из админки.
+    """
+    return 69000.0
+
+
 async def _edit_or_send(
         message=None,
         text: str | None = None,
@@ -597,7 +606,11 @@ _calc_accise(self, hp, is_commercial, engine_type, ...)
     except Exception:
         commission_rub = 0.0
 
-    result_block = format_result_block_rub_only(result_data, commission_rub=commission_rub)
+    result_block = format_result_block_rub_only(
+        result_data,
+        commission_rub=commission_rub,
+        broker_fee_rub=_get_broker_service_fee_rub(),
+    )
 
     # Используем весь state (включая hp и гибридные поля) + принудительно актуальный engine_cc
     header = format_selection_header({**data, "engine_cc": engine_cc}, age_title=age_title)
