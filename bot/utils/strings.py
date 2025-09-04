@@ -20,7 +20,10 @@ PROMPT_CHOOSE_VEHICLE_TYPE = "Выберите тип автомобиля:"
 PROMPT_CHOOSE_HYBRID_FUEL = "Выберите топливо ДВС в гибриде:"
 PROMPT_CHOOSE_DVS_GT_ED = "Мощность ДВС больше максимальной 30-минутной мощности ЭД?"
 
-CONTACT_LINE = "\nСвяжитесь с нами: <b>@jonnyfase</b>"
+CONTACT_LINE = (
+    "\nОбъявления тут: https://t.me/ChinaMotors123\n"
+    "Свяжитесь с нами: <b>@jonnyfase</b>"
+)
 
 # Прочее
 RESET_MESSAGE = "Сбросил состояние. Можем начать заново: нажмите 'Калькулятор' или введите /calc"
