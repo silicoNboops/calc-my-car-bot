@@ -1,7 +1,7 @@
 {
   "settings": {
     "vat_rate": 0.2,
-    "company_commission_rub": 99000,
+    "company_commission_rub": 99990,
     "util_base": 20000
   },
   "duty_rates": [
