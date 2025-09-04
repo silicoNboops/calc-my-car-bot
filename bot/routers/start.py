@@ -66,7 +66,7 @@ async def handle_start_command(message: Message, state: FSMContext) -> None:
 
     base = "Вас приветствует ChinaMotorsBot!"
     extra = (
-        "\nВы успешно зарегистрированы в боте." if is_new else "\nРады видеть вас снова."
+        "\nВы успешно зарегистрированы в боте." if is_new else "\nРады видеть вас снова.\n"
     )
     text = base + extra + CONTACT_LINE
     await message.answer(text, reply_markup=inline_start_menu_kb(), parse_mode="HTML")
