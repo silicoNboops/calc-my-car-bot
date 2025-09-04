@@ -199,13 +199,22 @@ def build_number_error(raw: str, *, what: str) -> str:
     return f"Ошибка: {what} должна быть > 0."
 
 
-def format_result_block_rub_only(values: dict, *, commission_rub: Optional[float] = None) -> str:
+def format_result_block_rub_only(
+        values: dict,
+        *,
+        commission_rub: Optional[float] = None,
+        broker_fee_rub: Optional[float] = None,
+) -> str:
     """Строит единый блок результата расчёта только в RUB.
 
     Ожидаемые ключи в values:
       - price_rub, duty_rub, util_fee, accise_rub, vat_rub, customs_fee, subtotal_customs
 
-    Если передан commission_rub, строка услуг брокера и финальный итог включаются в этот же блок.
+    Параметры:
+      - broker_fee_rub — фиксированные услуги брокера (оформление документов и т.п.)
+      - commission_rub — услуги подбора и сопровождения клиента
+
+    Обе суммы (если заданы и > 0) будут показаны отдельными строками и учтены в финальном итого.
     """
 
     # Безопасно читаем значения и приводим к float
@@ -234,14 +243,26 @@ def format_result_block_rub_only(values: dict, *, commission_rub: Optional[float
     ]
 
     grand_total = subtotal_customs
+
+    # 1) Фиксированные услуги брокера
+    if broker_fee_rub is not None and broker_fee_rub > 0:
+        try:
+            broker_val = float(broker_fee_rub)
+        except Exception:
+            broker_val = 0.0
+        if broker_val > 0:
+            lines.append(f"💼 Услуги брокера (RUB):<b> {fmt_money(broker_val)}</b>")
+            grand_total += broker_val
+
+    # 2) Услуги подбора и сопровождения
     if commission_rub is not None and commission_rub > 0:
         try:
             commission_val = float(commission_rub)
         except Exception:
             commission_val = 0.0
         if commission_val > 0:
-            lines.append(f"💼 Услуги брокера (RUB):<b> {fmt_money(commission_val)}</b>")
-            grand_total = subtotal_customs + commission_val
+            lines.append(f"🤝 Услуги подбора и сопровождения (RUB): <b>{fmt_money(commission_val)}</b>")
+            grand_total += commission_val
 
     # Пустая строка перед финальным итогом и сам итог
     lines.append("")
