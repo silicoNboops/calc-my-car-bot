@@ -18,7 +18,7 @@ from bot.utils.fsm import reset_wizard
 from bot.utils.strings import (
     PROMPT_CHOOSE_VEHICLE_TYPE,
     RESET_MESSAGE,
-    START_LEAD_SOON,
+    CONTACT_LINE,
 )
 
 if TYPE_CHECKING:
@@ -68,7 +68,8 @@ async def handle_start_command(message: Message, state: FSMContext) -> None:
     extra = (
         "\nВы успешно зарегистрированы в боте." if is_new else "\nРады видеть вас снова."
     )
-    await message.answer(base + extra, reply_markup=inline_start_menu_kb())
+    text = base + extra + CONTACT_LINE
+    await message.answer(text, reply_markup=inline_start_menu_kb(), parse_mode="HTML")
 
 
 # Inline-кнопки стартового меню (заглушки)
@@ -105,6 +106,5 @@ async def cb_start_rates(call: CallbackQuery) -> None:
             "Не удалось получить курсы. Попробуйте позже.",
             show_alert=True
         )
-
 
 # Обработчик start:lead перенесен в bot/routers/lead.py
