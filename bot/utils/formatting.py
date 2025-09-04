@@ -4,7 +4,6 @@ import re
 from datetime import datetime
 from typing import Optional
 
-from api.calculator.choices import EngineType as EngineTypeChoices
 from bot.keyboards.calculator import (
     format_engine_type_title,
     format_importer_kind_title,
@@ -147,10 +146,8 @@ def format_selection_header(data: dict, *, age_title: Optional[str] = None) -> s
     if hp:
         try:
             unit = str(data.get("hp_unit", "hp")).lower()
-            et = str(data.get("engine_type", ""))
             if unit == "kw":
-                is_30min = et in {EngineTypeChoices.ELECTRO, EngineTypeChoices.HYBRID_SERIES}
-                unit_label = "кВт (30‑мин)" if is_30min else "кВт"
+                unit_label = "кВт / 30 мин"
             else:
                 unit_label = "л.с."
             lines.append(f"— Мощность: <b>⚡ {format_amount(int(hp))} {unit_label}</b>")
