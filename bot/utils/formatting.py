@@ -145,7 +145,9 @@ def format_selection_header(data: dict, *, age_title: Optional[str] = None) -> s
     hp = data.get("hp")
     if hp:
         try:
-            lines.append(f"— Мощность: <b>⚡ {format_amount(int(hp))} л.с.</b>")
+            unit = str(data.get("hp_unit", "hp")).lower()
+            unit_label = "кВт" if unit == "kw" else "л.с."
+            lines.append(f"— Мощность: <b>⚡ {format_amount(int(hp))} {unit_label}</b>")
         except Exception:
             pass
 
