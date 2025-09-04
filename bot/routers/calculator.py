@@ -57,6 +57,7 @@ from bot.utils.strings import (
     PROMPT_CHOOSE_ENGINE_TYPE,
     PROMPT_ENTER_ENGINE_CC,
     PROMPT_ENTER_ENGINE_HP,
+    PROMPT_ENTER_ENGINE_HP_30MIN_KW,
     PROMPT_CHOOSE_AGE,
     PROMPT_CHOOSE_HYBRID_FUEL,
     PROMPT_CHOOSE_DVS_GT_ED,
@@ -342,7 +343,9 @@ async def choose_engine_type(call: CallbackQuery, state: FSMContext, callback_da
         if vt in {VehicleTypeChoices.CAR, VehicleTypeChoices.MOTORCYCLE}:
             # По умолчанию единица мощности — л.с.
             await state.update_data(hp_unit="hp")
-            msg = await _edit_or_send(call.message, header + PROMPT_ENTER_ENGINE_HP, reply_markup=power_unit_kb("hp"))
+            # Для электродвигателя используем контекстный промпт про 30-мин мощность и спец‑ярлык у кВт
+            prompt_text = header + PROMPT_ENTER_ENGINE_HP_30MIN_KW
+            msg = await _edit_or_send(call.message, prompt_text, reply_markup=power_unit_kb("hp", use_kw_30min=True))
             await state.update_data(prompt_chat_id=msg.chat.id, prompt_message_id=msg.message_id)
             await call.answer()
             await state.set_state(CalculatorState.ENGINE_HP)
@@ -430,15 +433,18 @@ async def input_engine_cc(message: Message, state: FSMContext) -> None:
 
     header2 = format_selection_header({**data, "engine_cc": value})
     if need_hp:
-        prompt_text = header2 + PROMPT_ENTER_ENGINE_HP
+        et = str(data.get("engine_type", ""))
+        use_kw_30min = et in {EngineTypeChoices.ELECTRO, EngineTypeChoices.HYBRID_SERIES}
+        prompt_text = header2 + (PROMPT_ENTER_ENGINE_HP_30MIN_KW if use_kw_30min else PROMPT_ENTER_ENGINE_HP)
         # Установим дефолтную единицу мощности, если не задана
         hp_unit = str(data.get("hp_unit", "hp")) or "hp"
         await state.update_data(hp_unit=hp_unit)
         if chat_id and msg_id:
-            await _edit_or_send(None, prompt_text, reply_markup=power_unit_kb(hp_unit), bot=message.bot,
+            await _edit_or_send(None, prompt_text, reply_markup=power_unit_kb(hp_unit, use_kw_30min=use_kw_30min),
+                                bot=message.bot,
                                 chat_id=chat_id, message_id=msg_id)
         else:
-            await _edit_or_send(message, prompt_text, reply_markup=power_unit_kb(hp_unit))
+            await _edit_or_send(message, prompt_text, reply_markup=power_unit_kb(hp_unit, use_kw_30min=use_kw_30min))
         await state.set_state(CalculatorState.ENGINE_HP)
         return
 
@@ -494,13 +500,17 @@ async def input_engine_hp(message: Message, state: FSMContext) -> None:
     if value is None:
         reason = build_number_error(raw, what="мощность")
         header = format_selection_header(data)
-        error_summary = header + f"<b>— Мощность: ❌ ОШИБКА</b>\n{reason}\n\n{PROMPT_ENTER_ENGINE_HP}"
+        et = str(data.get("engine_type", ""))
+        use_kw_30min = et in {EngineTypeChoices.ELECTRO, EngineTypeChoices.HYBRID_SERIES}
+        prompt_suffix = PROMPT_ENTER_ENGINE_HP_30MIN_KW if use_kw_30min else PROMPT_ENTER_ENGINE_HP
+        error_summary = header + f"<b>— Мощность: ❌ ОШИБКА</b>\n{reason}\n\n{prompt_suffix}"
         hp_unit = str(data.get("hp_unit", "hp")) or "hp"
         if chat_id and msg_id:
-            await _edit_or_send(None, error_summary, reply_markup=power_unit_kb(hp_unit), bot=message.bot,
+            await _edit_or_send(None, error_summary, reply_markup=power_unit_kb(hp_unit, use_kw_30min=use_kw_30min),
+                                bot=message.bot,
                                 chat_id=chat_id, message_id=msg_id)
         else:
-            await _edit_or_send(message, error_summary, reply_markup=power_unit_kb(hp_unit))
+            await _edit_or_send(message, error_summary, reply_markup=power_unit_kb(hp_unit, use_kw_30min=use_kw_30min))
         return
 
     # Сохраняем и переходим к возрасту
@@ -661,5 +671,8 @@ async def choose_power_unit(call: CallbackQuery, state: FSMContext, callback_dat
     await state.update_data(hp_unit=unit)
     data = await state.get_data()
     header = format_selection_header(data)
-    await _edit_or_send(call.message, header + PROMPT_ENTER_ENGINE_HP, reply_markup=power_unit_kb(unit))
+    et = str(data.get("engine_type", ""))
+    use_kw_30min = et in {EngineTypeChoices.ELECTRO, EngineTypeChoices.HYBRID_SERIES}
+    prompt_text = header + (PROMPT_ENTER_ENGINE_HP_30MIN_KW if use_kw_30min else PROMPT_ENTER_ENGINE_HP)
+    await _edit_or_send(call.message, prompt_text, reply_markup=power_unit_kb(unit, use_kw_30min=use_kw_30min))
     await call.answer()
