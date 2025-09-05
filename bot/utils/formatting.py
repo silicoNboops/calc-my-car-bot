@@ -127,8 +127,10 @@ def format_selection_header(data: dict, *, age_title: Optional[str] = None) -> s
         except Exception:
             pass
 
+    # Показываем "ДВС > ЭД" только для параллельного гибрида
     dvs_gt_electric = data.get("dvs_gt_electric")
-    if dvs_gt_electric is not None:
+    engine_type = data.get("engine_type")
+    if dvs_gt_electric is not None and engine_type != "Гибрид(послед)":
         try:
             yn = "да" if bool(dvs_gt_electric) else "нет"
             lines.append(f"— ДВС > ЭД: <b>{yn}</b>")
@@ -142,12 +144,27 @@ def format_selection_header(data: dict, *, age_title: Optional[str] = None) -> s
         except Exception:
             pass
 
+    # Отображаем мощность в оригинальных единицах, если они сохранены
+    hp_original_value = data.get("hp_original_value")
+    hp_original_unit = data.get("hp_original_unit")
     hp = data.get("hp")
-    if hp:
+    
+    if hp_original_value and hp_original_unit:
+        # Показываем оригинальное значение в оригинальных единицах
+        try:
+            if hp_original_unit == "kw":
+                unit_label = "кВт"
+            else:
+                unit_label = "л.с."
+            lines.append(f"— Мощность: <b>⚡ {format_amount(int(hp_original_value))} {unit_label}</b>")
+        except Exception:
+            pass
+    elif hp:
+        # Fallback для старой логики
         try:
             unit = str(data.get("hp_unit", "hp")).lower()
             if unit == "kw":
-                unit_label = "кВт / 30 мин"
+                unit_label = "кВт"
             else:
                 unit_label = "л.с."
             lines.append(f"— Мощность: <b>⚡ {format_amount(int(hp))} {unit_label}</b>")

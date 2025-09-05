@@ -349,10 +349,11 @@ async def choose_engine_type(call: CallbackQuery, state: FSMContext, callback_da
     if callback_data.kind == EngineTypeChoices.ELECTRO:
         # Очистим гибридные поля и зафиксируем engine_cc = 0
         await state.update_data(hybrid_ice_fuel=None, dvs_gt_electric=None, engine_cc=0)
+        # Для электромобилей всегда запрашиваем мощность с поддержкой л.с. и кВт
         if vt in {VehicleTypeChoices.CAR, VehicleTypeChoices.MOTORCYCLE}:
-            # По умолчанию единица мощности — кВт (30‑мин)
+            # По умолчанию единица мощности — кВт
             await state.update_data(hp_unit="kw")
-            # Для электродвигателя используем контекстный промпт про 30‑мин мощность и спец‑ярлык у кВт
+            # Для электродвигателя используем упрощенный промпт
             prompt_text = header + PROMPT_ENTER_ENGINE_HP_30MIN_KW
             msg = await _edit_or_send(call.message, prompt_text, reply_markup=power_unit_kb("kw", use_kw_30min=True))
             await state.update_data(prompt_chat_id=msg.chat.id, prompt_message_id=msg.message_id)
@@ -360,11 +361,13 @@ async def choose_engine_type(call: CallbackQuery, state: FSMContext, callback_da
             await state.set_state(CalculatorState.ENGINE_HP)
             return
         else:
-            # EV для quad/snowmobile — сразу возраст
-            msg = await _edit_or_send(call.message, header + PROMPT_CHOOSE_AGE, reply_markup=age_key_kb())
+            # EV для quad/snowmobile — тоже запрашиваем мощность
+            await state.update_data(hp_unit="kw")
+            prompt_text = header + PROMPT_ENTER_ENGINE_HP_30MIN_KW
+            msg = await _edit_or_send(call.message, prompt_text, reply_markup=power_unit_kb("kw", use_kw_30min=True))
             await state.update_data(prompt_chat_id=msg.chat.id, prompt_message_id=msg.message_id)
             await call.answer()
-            await state.set_state(CalculatorState.AGE_KEY)
+            await state.set_state(CalculatorState.ENGINE_HP)
             return
 
     # Если гибрид — сначала уточняем топливо ДВС, затем флаг ДВС>ЭД
@@ -471,14 +474,31 @@ async def input_engine_cc(message: Message, state: FSMContext) -> None:
 
 @router.callback_query(CalculatorState.HYBRID_ICE_FUEL, HybridFuelCD.filter())
 async def choose_hybrid_fuel(call: CallbackQuery, state: FSMContext, callback_data: HybridFuelCD) -> None:
-    # Сохраняем топливо ДВС в гибриде и спрашиваем про "ДВС > ЭД?"
+    # Сохраняем топливо ДВС в гибриде
     await state.update_data(hybrid_ice_fuel=callback_data.fuel)
     data = await state.get_data()
     header = format_selection_header(data)
-    msg = await _edit_or_send(call.message, header + PROMPT_CHOOSE_DVS_GT_ED, reply_markup=yes_no_kb())
-    await state.update_data(prompt_chat_id=msg.chat.id, prompt_message_id=msg.message_id)
-    await call.answer()
-    await state.set_state(CalculatorState.HYBRID_DVS_GT_ED)
+    engine_type = str(data.get("engine_type", ""))
+    
+    # Последовательный гибрид: убираем вопрос "ДВС > ЭД?" но запрашиваем мощность
+    if engine_type == EngineTypeChoices.HYBRID_SERIES:
+        await state.update_data(engine_cc=0, dvs_gt_electric=None)  # Не учитываем dvs_gt_electric вообще
+        # Запрашиваем мощность с поддержкой кВт/л.с.
+        await state.update_data(hp_unit="kw")  # По умолчанию кВт
+        prompt_text = header + PROMPT_ENTER_ENGINE_HP_30MIN_KW
+        msg = await _edit_or_send(call.message, prompt_text, reply_markup=power_unit_kb("kw", use_kw_30min=True))
+        await state.update_data(prompt_chat_id=msg.chat.id, prompt_message_id=msg.message_id)
+        await call.answer()
+        await state.set_state(CalculatorState.ENGINE_HP)
+        return
+    
+    # Параллельный гибрид: запрашиваем объём двигателя
+    if engine_type == EngineTypeChoices.HYBRID_PARALLEL:
+        msg = await _edit_or_send(call.message, header + PROMPT_ENTER_ENGINE_CC)
+        await state.update_data(prompt_chat_id=msg.chat.id, prompt_message_id=msg.message_id)
+        await call.answer()
+        await state.set_state(CalculatorState.ENGINE_CC)
+        return
 
 
 @router.callback_query(CalculatorState.HYBRID_DVS_GT_ED, YesNoCD.filter())
@@ -524,8 +544,23 @@ async def input_engine_hp(message: Message, state: FSMContext) -> None:
             await _edit_or_send(message, error_summary, reply_markup=power_unit_kb(hp_unit, use_kw_30min=use_kw_30min))
         return
 
-    # Сохраняем и переходим к возрасту
-    await state.update_data(hp=value)
+    # Конвертация кВт в л.с. для расчётов, но сохраняем оригинальную единицу для вывода
+    hp_unit = str(data.get("hp_unit", "hp"))
+    original_value = value
+    original_unit = hp_unit
+    
+    # Если ввод в кВт, конвертируем в л.с. для расчётов (1 кВт = 1.35962 л.с.)
+    if hp_unit == "kw":
+        hp_for_calculation = int(value * 1.35962)  # Конвертация кВт в л.с.
+    else:
+        hp_for_calculation = value
+    
+    # Сохраняем как конвертированное значение для расчётов, так и оригинальные данные для вывода
+    await state.update_data(
+        hp=hp_for_calculation,  # Для расчётов всегда в л.с.
+        hp_original_value=original_value,  # Оригинальное значение
+        hp_original_unit=original_unit  # Оригинальная единица
+    )
     data2 = await state.get_data()
     header2 = format_selection_header(data2)
     if chat_id and msg_id:

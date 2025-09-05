@@ -119,10 +119,15 @@ def map_bot_payload_to_v6_spec(payload: Dict[str, Any]) -> VehicleSpec:
     # Топология гибрида берём из engine_type (RU: "Гибрид(послед)"/"Гибрид(паралл)").
     is_series = engine_type == EngineType.HYBRID_SERIES
 
-    # По умолчанию оставляем консервативный флаг, но переопределяем если передан
+    # Обработка флага "ДВС > ЭД?" с учётом упрощённой логики
     dvs_flag_payload = payload.get("dvs_gt_electric", None)
-    if dvs_flag_payload is None:
-        dvs_gt_electric = True
+    
+    # Для последовательного гибрида полностью игнорируем dvs_gt_electric
+    if engine_type == EngineType.HYBRID_SERIES:
+        dvs_gt_electric = False  # Всегда False для последовательного гибрида
+    elif dvs_flag_payload is None:
+        # Для остальных типов дефолтные значения
+        dvs_gt_electric = False  # Более безопасный дефолт
     else:
         # допускаем bool/str("yes"/"no")/int
         if isinstance(dvs_flag_payload, bool):
@@ -133,16 +138,16 @@ def map_bot_payload_to_v6_spec(payload: Dict[str, Any]) -> VehicleSpec:
             try:
                 dvs_gt_electric = bool(dvs_flag_payload)
             except Exception:
-                dvs_gt_electric = True
+                dvs_gt_electric = False
 
     # Уточнение топлива ДВС у гибрида (важно для юр. пошлины — дизель имеет отдельные минимумы)
     hybrid_fuel_ru = payload.get("hybrid_ice_fuel", None)
     if engine_type in {EngineType.HYBRID_PARALLEL, EngineType.HYBRID_SERIES} and hybrid_fuel_ru:
         try:
             if str(hybrid_fuel_ru) == "Дизель":
-                fuel_type = FuelType.DIESEL
+                fuel_type = FuelType.DIESEL_ELECTRIC
             elif str(hybrid_fuel_ru) == "Бензин":
-                fuel_type = FuelType.GASOLINE
+                fuel_type = FuelType.GASOLINE_ELECTRIC
         except Exception:
             pass
 
