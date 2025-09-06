@@ -409,7 +409,8 @@ class CustomsCalculator:
             if engine_type == EngineTypeChoices.HYBRID_SERIES:
                 power_for_tax = int((dvs_hp or 0) + (electric_hp or 0))
             elif engine_type == EngineTypeChoices.HYBRID_PARALLEL:
-                power_for_tax = int(dvs_hp if dvs_hp is not None else int(hp * 0.65))
+                # Для параллельного гибрида используем только dvs_hp, без fallback на hp
+                power_for_tax = int(dvs_hp or 0)
             else:
                 power_for_tax = int(hp)
 
