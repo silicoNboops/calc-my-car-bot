@@ -629,9 +629,9 @@ def calc_util_fee(vehicle_type: VehicleType, importer_type: ImporterType,
             if engine_type == EngineType.ELECTRIC:
                 # K01: электро квадроциклы
                 if is_new:
-                    return base_rate * 0.4  # 69 000 руб.
+                    return base_rate * 0.7  # 69 000 руб.
                 else:
-                    return base_rate * 0.7  # 120 750 руб.
+                    return base_rate * 1.3  # 120 750 руб.
             elif engine_volume_cc < 300:
                 # K01: объем < 300 см³
                 if is_new:
@@ -965,15 +965,18 @@ def calculate_customs_payments(spec: VehicleSpec) -> CalculationResult:
     if spec.vehicle_type in [VehicleType.CAR, VehicleType.MOTORCYCLE]:
         excise_rub = calc_excise(spec)
 
-    # НДС (для юридических лиц и электромобилей для всех)
+    # НДС (для юридических лиц и электромобилей для всех, и всегда для мотоциклов, квадроциклов, снегоходов)
     vat_rub = 0.0
     is_electric_for_vat = (spec.engine_type == EngineType.ELECTRIC or
                            spec.fuel_type == FuelType.ELECTRIC or
                            (spec.fuel_type in [FuelType.DIESEL_ELECTRIC, FuelType.GASOLINE_ELECTRIC] and
                             spec.is_series_hybrid and not spec.dvs_power_greater_than_electric))
 
+    # VAT is always applied for motorcycles, quads, and snowmobiles
+    # For cars, VAT is applied for juridical importers or electric cars
     if (spec.importer_type == ImporterType.JURIDICAL or
-            (is_electric_for_vat and spec.vehicle_type == VehicleType.CAR)):
+            (is_electric_for_vat and spec.vehicle_type == VehicleType.CAR) or
+            spec.vehicle_type in [VehicleType.MOTORCYCLE, VehicleType.QUAD, VehicleType.SNOWMOBILE]):
         vat_base = cost_rub + duty_rub + excise_rub
         vat_rub = vat_base * RATES_2025['VAT_RATE']
 
