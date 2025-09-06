@@ -84,6 +84,8 @@ class VehicleSpec:
     # Параметры для новых гибридных типов
     is_series_hybrid: bool = False  # Силовая установка последовательного типа
     dvs_power_greater_than_electric: bool = False  # Мощность ДВС больше максимальной 30-минутной мощности ЭД
+    # Дополнительные параметры для электромобилей
+    power_kw: float = 0.0  # Мощность в кВт для электромобилей
 
 
 @dataclass
@@ -472,18 +474,39 @@ def calc_excise_progressive(power_hp: int) -> float:
     return excise
 
 
-def calc_excise_electric(power_hp: int) -> float:
+def calc_excise_electric(power_hp: int, power_kw: float = 0.0) -> float:
     """Расчет акциза для электромобилей по диапазонам мощности согласно electro_car_rules.txt
     
+    Если указана мощность в кВт, используем прямой расчет по кВт.
+    Иначе используем расчет по л.с.
+    
     Ставки акциза на электромобили (2025):
-    - до 90 л.с. включительно: 0 рублей
-    - свыше 90 и до 150 л.с.: 61 рубль за 1 л.с.
-    - свыше 150 и до 200 л.с.: 583 рубля за 1 л.с.
-    - свыше 200 до 300 л.с.: 955 рублей за 1 л.с.
-    - свыше 300 и до 400 л.с.: 1628 рублей за 1 л.с.
-    - свыше 400 и до 500 л.с.: 1685 рублей за 1 л.с.
-    - свыше 500 л.с.: 1740 рублей за 1 л.с.
+    - до 67,5 кВт (90 л.с.) включительно: 0 рублей
+    - свыше 67,5 и до 112,5 кВт (150 л.с.): 61 рубль за 0,75 кВт
+    - свыше 112,5 и до 150 кВт (200 л.с.): 583 рубля за 0,75 кВт
+    - свыше 150 и до 225 кВт (300 л.с.): 955 рублей за 0,75 кВт
+    - свыше 225 и до 300 кВт (400 л.с.): 1628 рублей за 0,75 кВт
+    - свыше 300 и до 375 кВт (500 л.с.): 1685 рублей за 0,75 кВт
+    - свыше 375 кВт (500 л.с.): 1740 рублей за 0,75 кВт
     """
+    # Если указана мощность в кВт, используем прямой расчет
+    if power_kw > 0:
+        if power_kw <= 67.5:
+            return 0.0
+        elif power_kw <= 112.5:
+            return power_kw * (61.0 / 0.75)
+        elif power_kw <= 150.0:
+            return power_kw * (583.0 / 0.75)
+        elif power_kw <= 225.0:
+            return power_kw * (955.0 / 0.75)
+        elif power_kw <= 300.0:  # 300 кВт включительно использует ставку 1628 руб/0.75 кВт
+            return power_kw * (1628.0 / 0.75)
+        elif power_kw <= 375.0:
+            return power_kw * (1685.0 / 0.75)
+        else:
+            return power_kw * (1740.0 / 0.75)
+    
+    # Иначе используем расчет по л.с.
     if power_hp <= 90:
         return 0.0
     elif power_hp <= 150:
@@ -541,7 +564,7 @@ def calc_excise(spec: VehicleSpec) -> float:
     if spec.engine_type == EngineType.ELECTRIC or spec.fuel_type == FuelType.ELECTRIC:
         # Электромобили облагаются акцизом даже для физлиц личное использование
         # Согласно electro_car_rules.txt
-        return calc_excise_electric(spec.power_hp)
+        return calc_excise_electric(spec.power_hp, spec.power_kw)
 
     # Обработка новых гибридных типов
     if spec.fuel_type in [FuelType.DIESEL_ELECTRIC, FuelType.GASOLINE_ELECTRIC]:
@@ -555,7 +578,7 @@ def calc_excise(spec: VehicleSpec) -> float:
                 return calc_excise_flat(spec.power_hp)
             else:
                 # ЭД ≥ ДВС → считаем как электромобиль
-                return calc_excise_electric(spec.power_hp)
+                return calc_excise_electric(spec.power_hp, spec.power_kw)
         else:
             # Параллельный гибрид → считаем как ДВС
             # Физические лица освобождены от акциза на ДВС

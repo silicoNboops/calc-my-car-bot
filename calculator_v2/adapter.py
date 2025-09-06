@@ -151,6 +151,19 @@ def map_bot_payload_to_v6_spec(payload: Dict[str, Any]) -> VehicleSpec:
         except Exception:
             pass
 
+    # Обработка мощности в кВт для электромобилей
+    power_kw = 0.0
+    hp_original_value = payload.get("hp_original_value")
+    hp_original_unit = payload.get("hp_original_unit")
+    
+    # Если мощность была введена в кВт, сохраняем её для правильного расчета акциза
+    if (engine_type == EngineType.ELECTRIC or fuel_type in {FuelType.ELECTRIC, FuelType.DIESEL_ELECTRIC, FuelType.GASOLINE_ELECTRIC}) and \
+       hp_original_value is not None and hp_original_unit == "kw":
+        try:
+            power_kw = float(hp_original_value)
+        except Exception:
+            power_kw = 0.0
+
     return VehicleSpec(
         vehicle_type=vehicle_type,
         importer_type=importer_type,
@@ -163,6 +176,7 @@ def map_bot_payload_to_v6_spec(payload: Dict[str, Any]) -> VehicleSpec:
         fuel_type=fuel_type,
         is_series_hybrid=is_series,
         dvs_power_greater_than_electric=dvs_gt_electric,
+        power_kw=power_kw,
     )
 
 

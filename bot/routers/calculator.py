@@ -647,6 +647,9 @@ _calc_accise(self, hp, is_commercial, engine_type, ...)
         # гибридные уточнения (если были заданы)
         "hybrid_ice_fuel": data.get("hybrid_ice_fuel"),
         "dvs_gt_electric": data.get("dvs_gt_electric"),
+        # оригинальные значения мощности для правильного расчета акциза
+        "hp_original_value": data.get("hp_original_value"),
+        "hp_original_unit": data.get("hp_original_unit"),
     }
     try:
         # Используем новый калькулятор v6 напрямую
