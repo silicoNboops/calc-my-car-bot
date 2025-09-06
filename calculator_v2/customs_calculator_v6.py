@@ -189,7 +189,24 @@ RATES_2025 = {
     'UTIL_COEFFS': {
         # Для физлиц личное использование
         'personal': {
-            'car': {'new': 3400, 'old': 5200},  # фиксированные суммы
+            'car': {
+                # Льготный утильсбор для личного использования по объему двигателя
+                'new_dvs_by_volume': [
+                    {'max_cc': 1000, 'coeff': 0.17},  # 3400 / 20000 = 0.17
+                    {'max_cc': 2000, 'coeff': 0.17},  # 3400 / 20000 = 0.17
+                    {'max_cc': 3000, 'coeff': 0.17},  # 3400 / 20000 = 0.17
+                    {'max_cc': 3500, 'coeff': 107.67},  # 2153400 / 20000 = 107.67
+                    {'max_cc': float('inf'), 'coeff': 137.11}  # 2742200 / 20000 = 137.11
+                ],
+                'old_dvs_by_volume': [
+                    {'max_cc': 1000, 'coeff': 0.26},  # 5200 / 20000 = 0.26
+                    {'max_cc': 2000, 'coeff': 0.26},  # 5200 / 20000 = 0.26
+                    {'max_cc': 3000, 'coeff': 0.26},  # 5200 / 20000 = 0.26
+                    {'max_cc': 3500, 'coeff': 164.84},  # 3296800 / 20000 = 164.84
+                    {'max_cc': float('inf'), 'coeff': 180.24}  # 3604800 / 20000 = 180.24
+                ],
+                'new_electric': 0.17, 'old_electric': 0.26  # Как для малых объемов
+            },
             'quad': {'new': 1.63, 'old': 6.1},
             'snowmobile': {'new': 1.63, 'old': 6.1},
             'motorcycle': {'new': 1.63, 'old': 6.1}
@@ -680,9 +697,33 @@ def calc_util_fee(vehicle_type: VehicleType, importer_type: ImporterType,
                     return base_rate * 1.3  # 224 250 руб.
 
     if importer_type == ImporterType.PHYS_PERSONAL:
-        # Для физлиц личное использование - фиксированные суммы
+        # Для физлиц личное использование
         if vehicle_key == 'car':
-            return RATES_2025['UTIL_COEFFS']['personal'][vehicle_key][age_key]
+            # Новая логика для гибридных типов
+            if spec and spec.fuel_type in [FuelType.DIESEL_ELECTRIC, FuelType.GASOLINE_ELECTRIC]:
+                if spec.is_series_hybrid:
+                    # Последовательный гибрид
+                    if spec.dvs_power_greater_than_electric:
+                        # ДВС > ЭД → считаем как ДВС (утилизационный сбор по объему ДВС)
+                        volume_table = RATES_2025['UTIL_COEFFS']['personal'][vehicle_key][f"{age_key}_dvs_by_volume"]
+                        rate_info = find_rate_by_value(engine_volume_cc, volume_table, 'max_cc')
+                        coeff = rate_info['coeff']
+                    else:
+                        # ЭД ≥ ДВС → считаем как электромобиль
+                        coeff = RATES_2025['UTIL_COEFFS']['personal'][vehicle_key][f"{age_key}_electric"]
+                else:
+                    # Параллельный гибрид → считаем как ДВС (утилизационный сбор по объему ДВС)
+                    volume_table = RATES_2025['UTIL_COEFFS']['personal'][vehicle_key][f"{age_key}_dvs_by_volume"]
+                    rate_info = find_rate_by_value(engine_volume_cc, volume_table, 'max_cc')
+                    coeff = rate_info['coeff']
+            elif engine_type == EngineType.ELECTRIC:
+                coeff = RATES_2025['UTIL_COEFFS']['personal'][vehicle_key][f"{age_key}_electric"]
+            else:
+                # ДВС - коэффициент по объему двигателя
+                volume_table = RATES_2025['UTIL_COEFFS']['personal'][vehicle_key][f"{age_key}_dvs_by_volume"]
+                rate_info = find_rate_by_value(engine_volume_cc, volume_table, 'max_cc')
+                coeff = rate_info['coeff']
+            return base_rate * coeff
         else:
             coeff = RATES_2025['UTIL_COEFFS']['personal'][vehicle_key][age_key]
             return base_rate * coeff
