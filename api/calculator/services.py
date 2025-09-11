@@ -594,11 +594,7 @@ class CbrfCurrencyProvider(CurrencyProvider):
         except Exception as e:  # noqa: BLE001
             self.logger.warning("CBRF rates cache get failed, continue without cache: %s", e)
 
-        # 1a) Попробуем процессный кэш
-        if isinstance(self._mem_cache, dict) and self._mem_cache:
-            return dict(self._mem_cache)
-
-        # 2) Сетевой запрос; на любые ошибки источника — fallback к фиксированным курсам
+        # 2) Сетевой запрос; при ошибке — пробуем процессный кэш, затем фиксированный провайдер
         try:
             resp = requests.get(self.url, timeout=10)
             resp.raise_for_status()
@@ -627,11 +623,14 @@ class CbrfCurrencyProvider(CurrencyProvider):
                 self.logger.warning("CBRF rates cache set failed, continue: %s", e)
             # Всегда обновляем процессный кэш на случай отсутствия Redis
             self.__class__._mem_cache = dict(rates)
-        except Exception as e:  # noqa: BLE001
-            self.logger.warning("CBRF rates fetch failed, fallback to fixed: %s", e)
-            return FixedCurrencyProvider().get_rates()
-        else:
             return rates
+        except Exception as e:  # noqa: BLE001
+            self.logger.warning("CBRF rates fetch failed, trying in-process cache, then fixed: %s", e)
+            # 2a) Попробуем процессный кэш только как fallback при неудаче сети
+            if isinstance(self._mem_cache, dict) and self._mem_cache:
+                return dict(self._mem_cache)
+            # 2b) Окончательный fallback — фиксированные курсы (оффлайн/CI)
+            return FixedCurrencyProvider().get_rates()
 
 
 def get_default_currency_provider() -> CurrencyProvider:
