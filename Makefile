@@ -21,7 +21,7 @@ run.celery.local:
 	OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES celery -A tasks.app worker --loglevel=DEBUG
 
 run.celery.prod:
-	celery -A tasks.app worker --loglevel=INFO
+	celery -A tasks.app worker --loglevel=INFO --concurrency=1 --pool=solo
 
 # Celery beat (scheduler)
 run.celery.beat.local:

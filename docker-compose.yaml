@@ -6,7 +6,7 @@ services:
         INSTALL_DEV_ENV: ${ENVIRONMENT:-production}
     environment:
       ENVIRONMENT: ${ENVIRONMENT:-production}
-      WORKERS: ${WORKERS:-2}
+      WORKERS: ${WORKERS:-1}
       THREADS: ${THREADS:-2}
     command: make run.server.prod
     ports:
@@ -87,15 +87,13 @@ services:
       - main
 
   rabbitmq:
-    image: rabbitmq:3-management
+    image: rabbitmq:3-alpine
     restart: unless-stopped
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-guest}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-guest}
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
-    ports:
-      - "${RABBITMQ_DASHBOARD_PORT:-15672}:15672"
     networks:
       - main
 
