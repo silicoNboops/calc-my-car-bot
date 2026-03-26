@@ -20,10 +20,14 @@ LOGGING = {
             "class": "logging.StreamHandler",
             "formatter": "colored",
         },
+        "telegram": {
+            "class": "api.config.telegram_log_handler.TelegramHandler",
+            "level": "ERROR",
+        },
     },
     "loggers": {
         "": {
-            "handlers": ["console"],
+            "handlers": ["console", "telegram"],
             "level": LOG_LEVEL,
             "propagate": True,
         },
