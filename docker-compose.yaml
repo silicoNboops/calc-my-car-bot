@@ -23,6 +23,7 @@ services:
       rabbitmq:
         condition: service_started
     restart: always
+    mem_limit: 256m
     volumes:
       - .:/application
     networks:
@@ -34,6 +35,7 @@ services:
     depends_on:
       - api
     restart: always
+    mem_limit: 300m
     volumes:
       - .:/application
     networks:
@@ -42,6 +44,7 @@ services:
   db:
     image: postgres:latest
     restart: unless-stopped
+    mem_limit: 256m
     env_file:
       - .env
     environment:
@@ -56,6 +59,7 @@ services:
   pgbouncer:
     image: edoburu/pgbouncer:latest
     restart: unless-stopped
+    mem_limit: 64m
     depends_on:
       - db
     environment:
@@ -81,6 +85,7 @@ services:
   redis:
     image: redis:latest
     restart: unless-stopped
+    mem_limit: 128m
     volumes:
       - redis-data:/data
     networks:
@@ -89,6 +94,7 @@ services:
   rabbitmq:
     image: rabbitmq:3-alpine
     restart: unless-stopped
+    mem_limit: 384m
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-guest}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-guest}
@@ -101,6 +107,7 @@ services:
     build: .
     command: make run.celery.prod
     restart: unless-stopped
+    mem_limit: 512m
     depends_on:
       - api
       - redis
@@ -119,6 +126,7 @@ services:
     build: .
     command: make run.celery.beat.local
     restart: unless-stopped
+    mem_limit: 512m
     depends_on:
       - api
       - redis
@@ -139,6 +147,7 @@ services:
     depends_on:
       - db
     restart: "no"
+    mem_limit: 256m
     volumes:
       - .:/application
     networks:
@@ -149,6 +158,8 @@ services:
     command: make collectstatic
     depends_on:
       - db
+    restart: "no"
+    mem_limit: 256m
     volumes:
       - .:/application
     networks:
