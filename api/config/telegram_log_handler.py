@@ -15,6 +15,12 @@ import urllib.error
 PROJECT_NAME = "calc-my-car-bot"
 COOLDOWN_SECONDS = 30
 
+IGNORED_LOGGERS = {"django.security.DisallowedHost", "django.security"}
+IGNORED_SUBSTRINGS = (
+    "DisallowedHost",
+    "development server over HTTPS",
+)
+
 
 class TelegramHandler(logging.Handler):
     def __init__(self, *args, **kwargs):
@@ -30,6 +36,12 @@ class TelegramHandler(logging.Handler):
 
     def emit(self, record: logging.LogRecord) -> None:
         if not self._token or not self._admin_ids:
+            return
+
+        if record.name in IGNORED_LOGGERS:
+            return
+        msg = record.getMessage()
+        if any(s in msg for s in IGNORED_SUBSTRINGS):
             return
 
         try:
