@@ -124,7 +124,7 @@ services:
 
   celery_beat:
     build: .
-    command: make run.celery.beat.local
+    command: make run.celery.beat.prod
     restart: unless-stopped
     mem_limit: 512m
     depends_on:

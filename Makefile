@@ -27,6 +27,9 @@ run.celery.prod:
 run.celery.beat.local:
 	celery -A tasks.app beat --loglevel=INFO
 
+run.celery.beat.prod:
+	celery -A tasks.app beat --loglevel=INFO
+
 # Manual trigger for daily rates task (docker env)
 task.rates:
 	docker compose --env-file .env run --rm \
