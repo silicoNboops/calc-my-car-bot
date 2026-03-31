@@ -19,6 +19,8 @@ IGNORED_LOGGERS = {"django.security.DisallowedHost", "django.security"}
 IGNORED_SUBSTRINGS = (
     "DisallowedHost",
     "development server over HTTPS",
+    "TelegramNetworkError",
+    "Connection reset by peer",
 )
 
 
