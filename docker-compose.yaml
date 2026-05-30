@@ -42,7 +42,7 @@ services:
       - main
 
   db:
-    image: postgres:latest
+    image: postgres:17
     restart: unless-stopped
     mem_limit: 256m
     env_file:
