@@ -145,3 +145,12 @@ media/
 staticfiles/
 
 .DS_Store
+# --- local evac/backup snapshots — never commit (contains .env + DB dumps) ---
+_evac_*/
+*.dump
+*.sql
+*.sql.gz
+*.tar.gz
+*.tgz
+backups/
+celerybeat-schedule.db
