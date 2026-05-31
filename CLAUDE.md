@@ -35,10 +35,12 @@ make fmt                 # ruff + black formatting
 make task.rates          # trigger daily rates send via docker
 ```
 
-## Production (VPS thorgash.xyz, SSH alias: tg)
+## Production (Hetzner Singapore, SSH alias: `coco` → 5.223.47.40)
+
+> Migrated 2026-05-31 off the seized THE.Hosting. SSH alias is now **`coco`** (root); `tg`/`tg-2` now point to the ThorGash server, NOT this box. DB pinned to `postgres:17` (was `:latest`→PG18 which broke the volume).
 
 ```bash
-# Deploy: push to main, then on server:
+# Deploy: push to main, then on server (ssh coco):
 cd /root/calc-my-car-bot && git pull origin main && docker compose up -d --force-recreate
 
 # Logs:
