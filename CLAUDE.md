@@ -1,5 +1,7 @@
 # calc-my-car-bot
 
+> ⛔ **DECOMMISSIONED 2026-06-01** — owner (Евгений) said the calculator is outdated; turned off on prod (`docker compose down` on `coco`, port :8011 freed, bot @china_motors_23_bot not polling). Code in git, DB dumped + volumes preserved on coco. To revive: `ssh coco; cd /root/calc-my-car-bot; docker compose up -d`. Full record: Obsidian "calc-my-car-bot — decommission 2026-06-01".
+
 Car import cost calculator with Telegram bot, Celery tasks, and RabbitMQ.
 
 ## Stack

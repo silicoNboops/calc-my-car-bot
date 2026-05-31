@@ -154,3 +154,6 @@ _evac_*/
 *.tgz
 backups/
 celerybeat-schedule.db
+
+# decommission backup (contains prod .env secrets — never commit)
+_decommission_backup_*/
