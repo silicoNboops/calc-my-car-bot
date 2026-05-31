@@ -53,7 +53,7 @@ docker compose restart api
 ```
 
 - **API:** port 8011 (Gunicorn behind nginx)
-- **Admin:** https://thorgash.xyz:8011/admin/
+- **Admin:** http://jojoprison.space:8011/admin/ *(plain HTTP on :8011, no SSL; domain swapped off thorgash.xyz 2026-06-01)*
 
 ## Key files
 
@@ -74,3 +74,5 @@ Note: uses `TELEGRAM_API_TOKEN` (not `TELEGRAM_BOT_TOKEN`) — handler checks bo
 - Celery worker runs with `--pool=solo --concurrency=1` on prod (RAM constrained)
 - All containers have `mem_limit` and restart policies
 - `collectstatic` service in compose had no `restart: "no"` — fixed 2026-03-26
+- ⚠️ **DEBUG must stay `True`** — admin static is served by Django's `static()` helper in `api/web/urls.py`, which only works with DEBUG=True (no WhiteNoise here). `DEBUG=False` → admin CSS 404 (unstyled). To run DEBUG=False, add WhiteNoise + collectstatic first.
+- ⚠️ On `.env`/config change use the **full** `docker compose up -d --force-recreate` — `--force-recreate api` alone recreates `db` but NOT `pgbouncer`, leaving stale pooled connections → `migrations` fails (`server_login_retry` / `connection is closed`).
